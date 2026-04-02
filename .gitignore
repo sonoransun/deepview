@@ -1,0 +1,190 @@
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+wheels/
+*.whl
+MANIFEST
+
+# Editable installs
+*.pth
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# ============================================================================
+# Testing & Coverage
+# ============================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+nosetests.xml
+
+# ============================================================================
+# Type checking / Linting
+# ============================================================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pytype/
+.pyre/
+
+# ============================================================================
+# IDE / Editors
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+*.sublime-project
+*.sublime-workspace
+.spyderproject
+.spyproject
+.ropeproject
+
+# ============================================================================
+# OS generated
+# ============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ============================================================================
+# Submodules / Subrepos / Vendored dependencies
+# ============================================================================
+# Prevent any nested git repos from being committed
+# (e.g., cloned tools like volatility3, LiME, yara, frida-gum, etc.)
+*/.git
+vendor/
+third_party/
+external/
+submodules/
+
+# Specific forensic tool checkouts that might be cloned locally
+volatility3/
+rekall/
+lime/
+avml/
+winpmem/
+osxpmem/
+pcileech/
+memprocfs-src/
+dwarf2json/
+yara-src/
+frida-src/
+lief-src/
+bcc-src/
+capstone-src/
+
+# ============================================================================
+# Dependency lock files that shouldn't override downstream
+# ============================================================================
+# pip-tools
+*.txt.bak
+
+# ============================================================================
+# Deep View runtime / user data
+# ============================================================================
+# Configuration and caches (created at runtime, user-specific)
+*.deepview/
+symbols/
+rules/
+
+# Memory dumps and forensic artifacts (can be massive)
+*.raw
+*.lime
+*.dmp
+*.vmem
+*.vmss
+*.vmsn
+*.core
+*.elf
+*.aff4
+*.crash
+hiberfil.sys
+
+# Reports generated during analysis
+reports/
+*.stix.json
+
+# Acquired evidence (never commit forensic evidence)
+evidence/
+acquisitions/
+dumps/
+
+# ============================================================================
+# Build artifacts from native components
+# ============================================================================
+# Compiled BPF programs
+*.bpf.o
+*.bpf.bc
+
+# Compiled monitoring stubs
+*.dvmon.o
+
+# Reassembled / patched binaries
+patched/
+instrumented/
+
+# ============================================================================
+# Secrets and credentials (safety net)
+# ============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.yaml
+secrets.yml
+*.secret
+
+# ============================================================================
+# Jupyter / data science (if used for analysis)
+# ============================================================================
+.ipynb_checkpoints/
+*.ipynb_metadata/
+
+# ============================================================================
+# Documentation build
+# ============================================================================
+docs/_build/
+site/
+
+# ============================================================================
+# Claude Code (local session state, not project config)
+# ============================================================================
+.claude/plans/
+.claude/projects/

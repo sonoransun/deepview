@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepview"
+version = "0.1.0"
+description = "Cross-platform computer system forensics and runtime analysis toolkit"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "structlog>=23.0",
+    "platformdirs>=4.0",
+]
+
+[project.optional-dependencies]
+memory = [
+    "volatility3>=2.5",
+    "yara-python>=4.3",
+]
+tracing = []
+instrumentation = [
+    "frida>=16.0",
+    "lief>=0.14",
+    "capstone>=5.0",
+]
+vm = []
+detection = [
+    "pyattck>=7.1",
+    "stix2>=3.0",
+]
+all = [
+    "deepview[memory]",
+    "deepview[tracing]",
+    "deepview[instrumentation]",
+    "deepview[vm]",
+    "deepview[detection]",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-asyncio>=0.21",
+    "pytest-mock>=3.10",
+    "mypy>=1.5",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+deepview = "deepview.cli.app:main"
+
+[project.entry-points."deepview.plugins"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.mypy]
+strict = true
+python_version = "3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "platform_linux: marks tests as Linux-only",
+    "platform_macos: marks tests as macOS-only",
+    "platform_windows: marks tests as Windows-only",
+    "requires_root: marks tests that require root/admin privileges",
+    "integration: marks integration tests",
+    "slow: marks slow-running tests",
+]
