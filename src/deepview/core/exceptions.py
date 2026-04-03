@@ -143,3 +143,25 @@ class RuleCompileError(ScanError):
 
 class ReportError(DeepViewError):
     """Report generation error."""
+
+
+# -- Memory translation ------------------------------------------------------
+
+class TranslationError(AnalysisError):
+    """Virtual-to-physical address translation failure."""
+
+
+class HeapParseError(AnalysisError):
+    """Heap structure parsing failure."""
+
+
+# -- Hardware ----------------------------------------------------------------
+
+class HardwareError(DeepViewError):
+    """Base exception for hardware-based forensic operations."""
+
+
+# -- Baseline ----------------------------------------------------------------
+
+class BaselineError(DeepViewError):
+    """Baseline profiling or comparison failure."""

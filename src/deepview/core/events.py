@@ -25,6 +25,38 @@ class ProcessDetectedEvent(Event):
         self.comm = comm
         self.timestamp = timestamp
 
+
+class RootkitDetectedEvent(Event):
+    def __init__(self, technique, description, severity="critical", evidence=None):
+        self.technique = technique
+        self.description = description
+        self.severity = severity
+        self.evidence = evidence or {}
+
+
+class ArtifactRecoveredEvent(Event):
+    def __init__(self, artifact_type, source, count=0, metadata=None):
+        self.artifact_type = artifact_type
+        self.source = source
+        self.count = count
+        self.metadata = metadata or {}
+
+
+class MemoryDiffEvent(Event):
+    def __init__(self, changed_pages, new_pages, removed_pages, change_rate=0.0):
+        self.changed_pages = changed_pages
+        self.new_pages = new_pages
+        self.removed_pages = removed_pages
+        self.change_rate = change_rate
+
+
+class BaselineDeviationEvent(Event):
+    def __init__(self, category, description, severity="warning", evidence=None):
+        self.category = category
+        self.description = description
+        self.severity = severity
+        self.evidence = evidence or {}
+
 class EventBus:
     """Decoupled publish-subscribe event distribution."""
 

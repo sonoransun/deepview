@@ -11,11 +11,11 @@
 
 ## Overview
 
-Deep View is a unified forensic analysis framework that brings together memory forensics, live system monitoring, virtual machine introspection, and binary instrumentation into a single, extensible toolkit. It is designed for incident responders, malware analysts, threat hunters, and security researchers who need to investigate compromised systems, analyze suspicious binaries, and correlate evidence across multiple data sources.
+Deep View is a unified forensic analysis framework that brings together memory forensics, live system monitoring, virtual machine introspection, binary instrumentation, and hardware-assisted extraction into a single, extensible toolkit. It is designed for incident responders, malware analysts, threat hunters, and security researchers who need to investigate compromised systems, analyze suspicious binaries, and correlate evidence across multiple data sources --- from user-space process memory down to physical DRAM, SPI flash, and GPU VRAM.
 
-The toolkit operates across Linux, macOS, and Windows, abstracting platform-specific mechanisms behind common interfaces. Memory dumps acquired with LiME, AVML, WinPmem, or OSXPmem are analyzed through dual engines --- Volatility 3 for its deep plugin ecosystem and MemProcFS for high-performance filesystem-style access. Live systems are observed through eBPF programs on Linux, DTrace probes on macOS, and ETW sessions on Windows, all feeding a unified event stream. Application behavior is captured through Frida-based dynamic instrumentation or static binary reassembly with embedded monitoring hooks.
+The toolkit operates across Linux, macOS, and Windows, abstracting platform-specific mechanisms behind common interfaces. Memory dumps acquired with LiME, AVML, WinPmem, or OSXPmem are analyzed through dual engines --- Volatility 3 for its deep plugin ecosystem and MemProcFS for high-performance filesystem-style access. Hardware-assisted acquisition via DMA (PCILeech over PCIe/Thunderbolt), cold boot DRAM remanence capture, and JTAG/chip-off extraction extends reach to non-cooperative, powered-off, and embedded targets. Live systems are observed through eBPF programs on Linux, DTrace probes on macOS, and ETW sessions on Windows, all feeding a unified event stream. Intel Processor Trace and ARM CoreSight provide instruction-level recording invisible to malware. Application behavior is captured through Frida-based dynamic instrumentation or static binary reassembly with embedded monitoring hooks.
 
-Detection modules automatically identify anti-forensics techniques (DKOM, SSDT hooks, inline hooks), process injection (12 MITRE T1055 sub-techniques), and encryption key material (AES, RSA, BitLocker). Findings are mapped to the MITRE ATT&CK framework and exported as STIX 2.1 intelligence objects for integration with SOC workflows.
+Deep View includes independent page table reconstruction (CR3 → PML4 → PT walk on raw physical memory), multi-encoding string carving with entropy filtering, TCP/IP stack reconstruction from kernel structures, and volatile artifact recovery (shell command history, clipboard, registry hives, environment variables). Detection modules automatically identify anti-forensics techniques (DKOM, SSDT hooks, inline hooks, PatchGuard bypasses, hypervisor rootkits, bootkits), process injection (12 MITRE T1055 sub-techniques), and encryption key material (AES, RSA, BitLocker, TLS session keys). Firmware-level analysis covers UEFI rootkit detection and SPI flash integrity verification. Findings are mapped to the MITRE ATT&CK framework and exported as STIX 2.1 intelligence objects for integration with SOC workflows.
 
 ---
 
@@ -42,6 +42,16 @@ graph TB
         VOL["Volatility 3<br/>Engine"]
         MPF["MemProcFS<br/>Engine"]
         SYM["Symbol Manager<br/>(dwarf2json)"]
+        PTW["Page Table Walker<br/>(CR3 → PML4 → PT)"]
+        VAL["Virtual Address Layer"]
+    end
+
+    subgraph Hardware["Hardware-Assisted Extraction"]
+        DMA["DMA Acquisition<br/>(PCILeech, Thunderbolt, FireWire)"]
+        CB["Cold Boot<br/>(DRAM remanence)"]
+        JTAG["JTAG / Chip-Off / ISP<br/>(mobile, embedded, IoT)"]
+        SPI["SPI Flash<br/>(Bus Pirate, Dediprog)"]
+        GPU["GPU Memory<br/>(CUDA, OpenCL)"]
     end
 
     subgraph Tracing["System Tracing"]
@@ -49,6 +59,8 @@ graph TB
         BPF["eBPF/BCC<br/>(Linux)"]
         DT["DTrace<br/>(macOS)"]
         ETW["ETW<br/>(Windows)"]
+        IPT["Intel PT<br/>(branch trace)"]
+        CS["ARM CoreSight"]
         TEB["Trace Event Bus<br/>(async queues)"]
     end
 
@@ -59,20 +71,29 @@ graph TB
         RE["Reassembler<br/>(trampoline injection)"]
     end
 
-    subgraph VM["VM Imaging"]
+    subgraph VM["VM Introspection"]
         VMM["VM Manager"]
         QEMU["QEMU/KVM<br/>(libvirt)"]
         VBOX["VirtualBox<br/>(vboxmanage)"]
         VMW["VMware<br/>(vmrun)"]
+        VMI["LibVMI / DRAKVUF<br/>(live introspection)"]
     end
 
     subgraph Detection["Detection & Scanning"]
-        AF["Anti-Forensics<br/>(DKOM, hooks)"]
+        AF["Anti-Forensics<br/>(DKOM, hooks, PatchGuard)"]
         INJ["Injection Detection<br/>(T1055)"]
-        EK["Key Scanner<br/>(AES, RSA, BitLocker)"]
+        EK["Key Scanner<br/>(AES, RSA, BitLocker, TLS)"]
         AD["Anomaly Detection<br/>(heuristic + ML)"]
+        RK["Rootkit Detection<br/>(hypervisor, bootkit)"]
         YS["YARA Scanner"]
+        SC["String Carver<br/>(multi-encoding)"]
         IOC["IoC Engine"]
+    end
+
+    subgraph Artifacts["Volatile Artifact Recovery"]
+        TCP["TCP/IP Stack<br/>Reconstruction"]
+        CMD["Command History<br/>(cmd, PS, bash)"]
+        FW["Firmware / UEFI<br/>Analysis"]
     end
 
     subgraph Reporting["Reporting & Export"]
@@ -94,10 +115,21 @@ graph TB
     MM --> VOL
     MM --> MPF
     MM --> SYM
+    MM --> PTW
+    PTW --> VAL
+
+    Hardware --> MM
+    DMA --> MM
+    CB --> MM
+    JTAG --> MM
+    SPI --> FW
+    GPU --> MM
 
     TM --> BPF
     TM --> DT
     TM --> ETW
+    TM --> IPT
+    TM --> CS
     TM --> TEB
 
     IM --> FE
@@ -107,14 +139,20 @@ graph TB
     VMM --> QEMU
     VMM --> VBOX
     VMM --> VMW
+    VMM --> VMI
 
     MM --> YS
+    MM --> SC
     MM --> AF
     MM --> INJ
     MM --> EK
+    MM --> RK
+    MM --> TCP
+    MM --> CMD
 
     AF --> STIX
     INJ --> ATT
+    RK --> ATT
     TL --> RE2
 ```
 
@@ -127,22 +165,31 @@ flowchart LR
         DUMP["Memory Dump"]
         VMSNAP["VM Snapshot"]
         BIN["Suspect Binary"]
+        HW["Hardware Target<br/>(PCIe, JTAG, DIMM)"]
+        FW["Firmware<br/>(SPI Flash)"]
+        GPUD["GPU Device"]
     end
 
     subgraph Acquire["Acquisition"]
         A1["LiME / AVML /<br/>WinPmem / OSXPmem"]
         A2["VM Extract<br/>(virsh, vboxmanage, vmrun)"]
+        A3["DMA / Cold Boot /<br/>JTAG / Chip-Off"]
+        A4["SPI Read<br/>(flashrom, CHIPSEC)"]
+        A5["GPU Dump<br/>(CUDA, OpenCL)"]
     end
 
     subgraph Analyze["Analysis Layer"]
         DL["DataLayer<br/>(abstract memory source)"]
+        PTW["Page Table Walker<br/>(virtual addr translation)"]
         V3["Volatility 3"]
         MFS["MemProcFS"]
     end
 
     subgraph Detect["Detection"]
         YARA["YARA Rules<br/>(malware, creds, exploits)"]
-        DET["Detection Modules<br/>(DKOM, injection, keys)"]
+        STRCAR["String Carver<br/>(multi-encoding + entropy)"]
+        DET["Detection Modules<br/>(DKOM, injection, keys,<br/>rootkits, bootkits)"]
+        ARTIF["Artifact Recovery<br/>(TCP stack, commands,<br/>clipboard, registry)"]
         SCORE["Anomaly Scoring"]
     end
 
@@ -156,11 +203,16 @@ flowchart LR
     LIVE --> A1 --> DL
     DUMP --> DL
     VMSNAP --> A2 --> DL
+    HW --> A3 --> DL
+    FW --> A4 --> DL
+    GPUD --> A5 --> DL
     BIN --> BA2["Binary Analysis<br/>(LIEF)"]
 
-    DL --> V3 --> DET
+    DL --> PTW --> V3 --> DET
     DL --> MFS --> DET
     DL --> YARA --> DET
+    DL --> STRCAR --> DET
+    DET --> ARTIF
     DET --> SCORE
 
     SCORE --> HTML
@@ -220,6 +272,127 @@ flowchart LR
 | **Encryption key recovery** | AES-128/256 key schedule detection, RSA private key structures, BitLocker FVEK signatures |
 | **Anomaly scoring** | Heuristic feature analysis (RWX regions, unknown modules, heap entropy) with optional scikit-learn Isolation Forest |
 | **IoC matching** | IP, domain, hash, URL, mutex, and string indicators against memory and file targets |
+
+### Hardware-Assisted Memory Forensics
+
+| Feature | Description |
+|---------|-------------|
+| **DMA acquisition (PCILeech)** | Non-cooperative physical memory capture over PCIe, Thunderbolt, or FireWire using FPGA boards (Screamer, SP605). Zero forensic footprint on the target; rootkits cannot intercept hardware DMA reads. Based on Ulf Frisk's PCILeech and leechcore library |
+| **Cold boot capture** | DRAM remanence exploitation per Halderman et al. 2008 ("Lest We Remember"). Bit-decay confidence modeling as a function of temperature and elapsed time. DDR3/DDR4 memory controller descrambling per Bauer et al. 2016 |
+| **JTAG extraction** | Boundary-scan memory reads from embedded, mobile, and IoT devices via OpenOCD, RIFF Box, or Easy-JTAG. Conforms to IEEE 1149.1 and NIST SP 800-101r1 physical extraction levels |
+| **Chip-off / ISP** | Post-mortem NAND/eMMC raw imaging from desoldered flash chips or in-system programming probes. FTL reconstruction exposes wear-leveling residue and logically deleted pages invisible to filesystem tools |
+| **GPU VRAM extraction** | CUDA `cuMemcpyDtoH` and OpenCL readback of GPU device memory. Recovers cryptocurrency wallet keys, ML model weights, rendered framebuffers, and hashcat residue that are invisible to CPU-side memory dumps |
+| **SPI flash dumping** | Firmware image extraction via software (flashrom, CHIPSEC) or hardware (Bus Pirate, Dediprog, CH341A). Enables UEFI rootkit detection and firmware integrity verification |
+| **Intel Processor Trace** | Branch-level execution recording via `perf_event_open()` and Intel `libipt` decoder. Invisible to and untamperable by malware; near-zero runtime overhead (Ge et al. ASPLOS 2017, "Griffin") |
+| **ARM CoreSight** | Trace infrastructure for Cortex-A processors providing non-invasive instruction flow capture |
+| **Live VM introspection** | LibVMI and DRAKVUF integration for transparent guest memory and register access via EPT-based invisible breakpoints (Lengyel et al. ACSAC 2014). Transforms VM analysis from passive snapshot to active real-time introspection |
+
+```mermaid
+flowchart TD
+    subgraph HardwareSources["Hardware Acquisition Sources"]
+        PCIE["PCIe / Thunderbolt<br/>(FPGA: Screamer, SP605)"]
+        FW1394["FireWire / IEEE 1394"]
+        DIMM["Physical DIMM<br/>(cold boot)"]
+        JTAGP["JTAG Probe<br/>(OpenOCD, RIFF)"]
+        ISPPR["ISP Probe<br/>(eMMC CMD/CLK/DAT)"]
+        CHIPOFF["Desoldered Flash<br/>(NAND/eMMC programmer)"]
+        SPIHW["SPI Probe<br/>(Bus Pirate, Dediprog)"]
+        GPUDEV["GPU Device<br/>(NVIDIA, AMD)"]
+    end
+
+    subgraph Providers["Acquisition Providers"]
+        PCIL["PCILeech<br/>via leechcore"]
+        CBPROV["Cold Boot Provider<br/>(remanence model +<br/>DDR descrambler)"]
+        JTAGPROV["JTAG Provider<br/>(OpenOCD backend)"]
+        COPROV["Chip-Off Provider<br/>(FTL reconstruction)"]
+        ISPPROV["ISP Provider"]
+        SPIPROV["SPI Flash Provider<br/>(flashrom / CHIPSEC)"]
+        GPUPROV["GPU Provider<br/>(CUDA / OpenCL)"]
+    end
+
+    subgraph Layers["DataLayer Implementations"]
+        DMA_LAYER["DMA Live Layer<br/>(real-time read)"]
+        CB_LAYER["Cold Boot Layer<br/>(decay confidence)"]
+        NAND_LAYER["NAND Layer<br/>(page/block geometry)"]
+        EMMC_LAYER["eMMC Layer<br/>(partition table)"]
+        SPI_LAYER["SPI Flash Layer<br/>(region map)"]
+        UEFI_LAYER["UEFI Volume Layer<br/>(FFS + GUID)"]
+        GPU_LAYER["GPU Layer<br/>(local/shared/const)"]
+    end
+
+    ANALYSIS["Analysis Pipeline<br/>(Volatility 3, MemProcFS,<br/>Page Table Walker,<br/>Detection Modules)"]
+
+    PCIE --> PCIL --> DMA_LAYER
+    FW1394 --> PCIL
+    DIMM --> CBPROV --> CB_LAYER
+    JTAGP --> JTAGPROV --> NAND_LAYER
+    ISPPR --> ISPPROV --> EMMC_LAYER
+    CHIPOFF --> COPROV --> NAND_LAYER
+    SPIHW --> SPIPROV --> SPI_LAYER
+    SPIPROV --> UEFI_LAYER
+    GPUDEV --> GPUPROV --> GPU_LAYER
+
+    DMA_LAYER --> ANALYSIS
+    CB_LAYER --> ANALYSIS
+    NAND_LAYER --> ANALYSIS
+    EMMC_LAYER --> ANALYSIS
+    SPI_LAYER --> ANALYSIS
+    UEFI_LAYER --> ANALYSIS
+    GPU_LAYER --> ANALYSIS
+```
+
+### Advanced Memory Analysis
+
+| Feature | Description |
+|---------|-------------|
+| **Page table reconstruction** | Independent CR3 → PML4 → PDPT → PD → PT walk on raw physical memory, supporting 4K/2M/1G pages and 5-level (LA57) paging. Brute-force CR3 candidate scanning as fallback when OS structures are corrupted. Based on Intel SDM Vol. 3A Ch. 4 and Dolan-Gavitt's robust enumeration work |
+| **Virtual address layer** | `DataLayer` implementation that transparently translates virtual address reads to physical, handling cross-page-boundary access. Enables per-process virtual address space analysis without Volatility |
+| **Multi-encoding string carving** | Extract printable strings across ASCII, UTF-8, UTF-16LE/BE, Shift-JIS, EUC-KR, ISO-8859-1, and CP1252 with Shannon entropy pre-filtering to skip encrypted/compressed regions (threshold-configurable) |
+| **TCP/IP stack reconstruction** | Network connection recovery via Windows pool tag scanning (TcpE, TcpL, UdpA) and Linux `inet_sock` signature matching. Extracts protocol, addresses, ports, TCP state, and owning PID |
+| **Command history extraction** | Shell command recovery from memory for cmd.exe (UTF-16LE COMMAND_HISTORY), PowerShell (ConsoleHost/PSReadLine), and bash (HIST_ENTRY) via heuristic signature and command-pattern matching |
+
+```mermaid
+flowchart LR
+    subgraph PhysMem["Physical Memory Image"]
+        RAW["Raw / LiME /<br/>ELF Core Dump"]
+    end
+
+    subgraph Translation["Page Table Reconstruction"]
+        CR3["CR3 Discovery<br/>(brute-force scan or<br/>EPROCESS extraction)"]
+        PML4["PML4 Walk<br/>(512 entries)"]
+        PDPT["PDPT Walk"]
+        PD["PD Walk<br/>(2M large page check)"]
+        PT["PT Walk<br/>(4K page)"]
+        VIRT["Virtual Address<br/>Layer"]
+    end
+
+    subgraph Analysis["Per-Process Analysis"]
+        HEAP["Heap Forensics<br/>(freed data recovery)"]
+        NET["TCP/IP Stack<br/>Reconstruction"]
+        STR["String Carving<br/>(multi-encoding)"]
+        CMD["Command History<br/>(cmd, PS, bash)"]
+        ENV["Environment<br/>Variables"]
+    end
+
+    RAW --> CR3 --> PML4 --> PDPT --> PD --> PT --> VIRT
+
+    VIRT --> HEAP
+    VIRT --> NET
+    VIRT --> STR
+    VIRT --> CMD
+    VIRT --> ENV
+```
+
+### Firmware & Rootkit Detection
+
+| Feature | Description |
+|---------|-------------|
+| **UEFI rootkit detection** | Signature scanning for known firmware implants (LoJax/APT28, MosaicRegressor) and rogue DXE drivers. Based on ESET 2018 and Kaspersky 2020 research |
+| **Firmware integrity** | Compare extracted SPI flash contents against known-good hash databases. Verify BIOS write protection (CHIPSEC) and Secure Boot configuration |
+| **Bootkit detection** | MBR/VBR integrity verification against known-good boot code templates. Detect INT 13h hooks and encrypted JMP sequences (TDL4, FinSpy). Maps to ATT&CK T1542.003 |
+| **PatchGuard bypass detection** | Identify Windows KPP circumvention via `KiErrata` integrity checks, DPC routine validation, and `HalPrivateDispatchTable` modification scanning. Maps to ATT&CK T1562.001 |
+| **Hypervisor rootkit detection** | Detect Blue Pill (Rutkowska 2006) and SubVirt (King et al. 2006) style thin hypervisors via VMCS signature scanning in physical memory, CPUID timing analysis, and unexpected VMX MSR values. Maps to ATT&CK T1564.006 |
+| **Driver signature verification** | Cross-reference in-memory driver image hashes against known-good databases. Section-by-section integrity comparison detects runtime patching |
 
 ---
 
@@ -432,17 +605,31 @@ flowchart LR
 | Capability | Linux | macOS | Windows |
 |:-----------|:-----:|:-----:|:-------:|
 | Memory acquisition | LiME, AVML, /proc/kcore | OSXPmem | WinPmem |
+| DMA acquisition (PCILeech) | PCIe, Thunderbolt | Thunderbolt | PCIe, Thunderbolt |
+| Cold boot capture | Yes | Yes | Yes |
+| JTAG / chip-off / ISP | Yes | Yes | Yes |
+| GPU VRAM extraction | CUDA, OpenCL | Metal, OpenCL | CUDA, OpenCL |
+| SPI flash / firmware | flashrom, CHIPSEC | flashrom | CHIPSEC |
 | Memory analysis (Volatility 3) | Yes | Yes | Yes |
 | Memory analysis (MemProcFS) | Yes | Yes | Yes |
+| Page table reconstruction | Yes | Yes | Yes |
+| String carving (multi-encoding) | Yes | Yes | Yes |
+| TCP/IP stack reconstruction | Yes | -- | Yes |
+| Command history extraction | bash | bash | cmd, PowerShell |
 | YARA scanning | Yes | Yes | Yes |
 | System tracing | eBPF/BCC | DTrace | ETW |
+| Intel Processor Trace | Broadwell+ | -- | -- |
+| ARM CoreSight | Cortex-A | Apple Silicon | -- |
 | Frida instrumentation | Yes | Yes | Yes |
 | Binary analysis (LIEF) | ELF | Mach-O | PE |
 | Binary reassembly | ELF | Mach-O | PE |
 | VM connectors | QEMU/KVM, VBox, VMware | VBox, VMware | VBox, VMware |
+| Live VM introspection (LibVMI) | KVM, Xen | -- | -- |
 | DKOM detection | Yes | -- | Yes |
 | Injection detection | Yes | Yes | Yes |
 | Encryption key scanning | Yes | Yes | Yes |
+| Rootkit detection (hypervisor, bootkit) | Yes | -- | Yes |
+| Firmware / UEFI analysis | Yes | Yes | Yes |
 | STIX 2.1 export | Yes | Yes | Yes |
 | ATT&CK mapping | Yes | Yes | Yes |
 
@@ -461,6 +648,18 @@ pip install "deepview[memory]"
 
 # With instrumentation support
 pip install "deepview[instrumentation]"
+
+# Hardware-assisted acquisition (DMA via PCILeech)
+pip install "deepview[hardware]"
+
+# Firmware / UEFI forensics
+pip install "deepview[firmware]"
+
+# GPU VRAM forensics
+pip install "deepview[gpu]"
+
+# ML-based anomaly detection
+pip install "deepview[ml]"
 
 # Full installation (all optional dependencies)
 pip install "deepview[all]"
@@ -532,10 +731,17 @@ Commands:
   doctor                     Check system capabilities and tools
   plugins                    List installed plugins
 
-  memory acquire             Acquire memory from live system
+  memory acquire             Acquire memory from live system or via hardware
   memory analyze             Run analysis plugin on memory image
   memory symbols             Manage kernel symbol tables
   memory scan                YARA scan on memory image
+  memory strings             Carve strings (multi-encoding, entropy-filtered)
+  memory pagetables          Walk page tables from CR3
+  memory netstat             Reconstruct TCP/IP connections from memory
+  memory history             Extract shell command history
+  memory diff                Compare two memory snapshots
+  memory baseline build      Build known-good memory profile
+  memory baseline compare    Compare image against baseline
 
   trace syscall              Trace system calls
   trace network              Trace network activity
@@ -552,10 +758,13 @@ Commands:
   vm snapshot                Create VM snapshot
   vm extract                 Extract VM memory/state
   vm analyze                 Snapshot + analyze in one step
+  vm introspect              Live VM memory read via LibVMI
 
   scan yara                  Run YARA rules against target
   scan ioc                   Run IoC indicator matching
   scan rules                 Manage YARA rule sets
+  scan firmware              UEFI/SPI flash integrity check
+  scan rootkit               Hypervisor, bootkit, PatchGuard detection
 
   report generate            Create HTML/Markdown report
   report timeline            Generate event timeline
@@ -607,11 +816,14 @@ class MyAnalysisPlugin(DeepViewPlugin):
 | Plugin | Category | Description |
 |--------|----------|-------------|
 | `pslist` | Memory Analysis | List processes from memory image (Volatility 3 / MemProcFS) |
-| `netstat` | Network Analysis | Enumerate network connections from memory |
+| `netstat` | Network Forensics | Reconstruct TCP/UDP connections from kernel structures (Windows pool tags, Linux inet_sock) |
 | `malfind` | Malware Detection | Detect suspicious memory regions, injected code, hollow processes |
 | `dkom_detect` | Malware Detection | Detect hidden processes via kernel structure cross-referencing |
 | `timeliner` | Timeline | Extract temporal artifacts across memory structures |
 | `credentials` | Credentials | Extract password hashes, private keys, and session tokens |
+| `pagetable_walk` | Memory Analysis | Walk x86-64 page tables (4/5-level) to enumerate virtual-to-physical mappings |
+| `strings` | Memory Analysis | Carve printable strings across multiple encodings with entropy filtering |
+| `command_history` | Artifact Recovery | Extract shell command history (cmd.exe, PowerShell, bash) from process memory |
 
 ---
 
@@ -628,6 +840,7 @@ mindmap
       T1014 Rootkit
         DKOM hidden processes
         Driver hiding
+        Driver signature mismatch
       T1055 Process Injection
         T1055.001 DLL Injection
         T1055.002 PE Injection
@@ -642,16 +855,37 @@ mindmap
         Inline hooks
       T1036.005 Match Legitimate Name
         PEB masquerading
+      T1562.001 Disable Security Tools
+        PatchGuard bypass detection
+      T1564.006 Run Virtual Instance
+        Hypervisor rootkit detection
+        VMCS scanning
+        CPUID timing analysis
+    Persistence
+      T1542 Pre-OS Boot
+        T1542.001 System Firmware
+          UEFI rootkit detection
+          SPI flash integrity
+        T1542.003 Bootkit
+          MBR/VBR integrity
+          Boot code tampering
     Credential Access
       Encryption key recovery
         AES-128/256 key schedules
         RSA private key structures
         BitLocker FVEK
         dm-crypt master keys
+        TLS session keys
     Discovery
       Process enumeration
       Network connections
       Loaded modules
+      Page table mapping
+    Collection
+      Volatile artifacts
+        Command history
+        Clipboard contents
+        Environment variables
 ```
 
 ### DKOM Detection

@@ -32,12 +32,40 @@ detection = [
     "pyattck>=7.1",
     "stix2>=3.0",
 ]
+hardware = [
+    "leechcore>=2.0",
+]
+firmware = [
+    "chipsec>=1.10",
+    "uefi-firmware>=1.9",
+]
+gpu = [
+    "pycuda>=2022.1",
+    "pyopencl>=2022.1",
+]
+ml = [
+    "scikit-learn>=1.3",
+    "xgboost>=2.0",
+]
+sigma = [
+    "pyyaml>=6.0",
+]
+sidechannel = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
 all = [
     "deepview[memory]",
     "deepview[tracing]",
     "deepview[instrumentation]",
     "deepview[vm]",
     "deepview[detection]",
+    "deepview[hardware]",
+    "deepview[firmware]",
+    "deepview[gpu]",
+    "deepview[ml]",
+    "deepview[sigma]",
+    "deepview[sidechannel]",
 ]
 dev = [
     "pytest>=7.0",

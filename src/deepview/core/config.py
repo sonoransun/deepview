@@ -30,6 +30,30 @@ class ReportingConfig(BaseSettings):
     default_template: str = "html"
     output_dir: Path = Path(user_config_dir(_APP_NAME)) / "reports"
 
+
+class HardwareConfig(BaseSettings):
+    dma_backend: str = "auto"
+    pcileech_device: str = ""
+    cold_boot_temperature_c: float = -50.0
+    cold_boot_elapsed_s: float = 0.0
+
+
+class FirmwareConfig(BaseSettings):
+    spi_backend: str = "auto"
+    chipsec_modules: list[str] = Field(default_factory=list)
+    known_good_firmware_db: str = ""
+
+
+class GPUConfig(BaseSettings):
+    backend: str = "auto"
+    cuda_device_id: int = 0
+
+
+class SideChannelConfig(BaseSettings):
+    sdr_device: str = ""
+    chipwhisperer_serial: str = ""
+    sample_rate_hz: int = 20_000_000
+
 class DeepViewConfig(BaseSettings):
     model_config = {"env_prefix": "DEEPVIEW_"}
 
@@ -45,6 +69,10 @@ class DeepViewConfig(BaseSettings):
     tracing: TracingConfig = Field(default_factory=TracingConfig)
     instrumentation: InstrumentationConfig = Field(default_factory=InstrumentationConfig)
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
+    hardware: HardwareConfig = Field(default_factory=HardwareConfig)
+    firmware: FirmwareConfig = Field(default_factory=FirmwareConfig)
+    gpu: GPUConfig = Field(default_factory=GPUConfig)
+    sidechannel: SideChannelConfig = Field(default_factory=SideChannelConfig)
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> DeepViewConfig:

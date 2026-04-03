@@ -71,6 +71,11 @@ class ATTCKMapper:
         "INJECTED_CODE": {"id": "T1055", "name": "Process Injection", "tactic": "Defense Evasion"},
         "SUSPICIOUS_THREAD": {"id": "T1055.003", "name": "Thread Execution Hijacking", "tactic": "Defense Evasion"},
         "PEB_MASQUERADE": {"id": "T1036.005", "name": "Match Legitimate Name", "tactic": "Defense Evasion"},
+        "PATCHGUARD_BYPASS": {"id": "T1562.001", "name": "Disable or Modify Tools", "tactic": "Defense Evasion"},
+        "HYPERVISOR_ROOTKIT": {"id": "T1564.006", "name": "Run Virtual Instance", "tactic": "Defense Evasion"},
+        "BOOTKIT": {"id": "T1542.003", "name": "Bootkit", "tactic": "Persistence"},
+        "UNSIGNED_DRIVER": {"id": "T1068", "name": "Exploitation for Privilege Escalation", "tactic": "Privilege Escalation"},
+        "DRIVER_INTEGRITY_MISMATCH": {"id": "T1014", "name": "Rootkit", "tactic": "Defense Evasion"},
     }
 
     def map_detection(self, detection: Detection) -> dict | None:

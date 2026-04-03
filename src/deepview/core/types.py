@@ -25,6 +25,11 @@ class DumpFormat(str, enum.Enum):
     ELF_CORE = "elf_core"
     CRASHDUMP = "crashdump"
     PADDED = "padded"
+    NAND_RAW = "nand_raw"
+    EMMC_RAW = "emmc_raw"
+    JTAG_RAM = "jtag_ram"
+    SPI_FLASH = "spi_flash"
+    GPU_VRAM = "gpu_vram"
 
 
 class ProbeType(str, enum.Enum):
@@ -33,6 +38,8 @@ class ProbeType(str, enum.Enum):
     UPROBE = "uprobe"
     TRACEPOINT = "tracepoint"
     USDT = "usdt"
+    HARDWARE_TRACE = "hardware_trace"
+    CORESIGHT = "coresight"
 
 
 class EventCategory(str, enum.Enum):
@@ -58,6 +65,10 @@ class PluginCategory(str, enum.Enum):
     MALWARE_DETECTION = "malware_detection"
     TIMELINE = "timeline"
     CREDENTIALS = "credentials"
+    ROOTKIT_DETECTION = "rootkit_detection"
+    NETWORK_FORENSICS = "network_forensics"
+    ARTIFACT_RECOVERY = "artifact_recovery"
+    DIFFERENTIAL = "differential"
     CUSTOM = "custom"
 
 
