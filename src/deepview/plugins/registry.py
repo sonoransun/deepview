@@ -45,6 +45,8 @@ class PluginRegistry:
             log.debug("no_builtin_plugins")
 
         for name, cls in get_registered_plugins().items():
+            if name in self._plugins:
+                log.warning("duplicate_plugin_name", name=name, replaced_by=cls.__name__)
             self._plugins[name] = cls
             log.debug("registered_builtin_plugin", name=name)
 
@@ -57,13 +59,16 @@ class PluginRegistry:
                 if hasattr(eps, "select")
                 else eps.get(ENTRY_POINT_GROUP, [])
             )
-        except Exception:
+        except Exception as e:
+            log.warning("entrypoint_discovery_failed", error=str(e))
             plugin_eps = []
 
         for ep in plugin_eps:
             try:
                 plugin_cls = ep.load()
                 name = ep.name
+                if name in self._plugins:
+                    log.warning("duplicate_plugin_name", name=name, replaced_by=plugin_cls.__name__)
                 self._plugins[name] = plugin_cls
                 log.debug("registered_entrypoint_plugin", name=name)
             except Exception as e:
@@ -89,8 +94,8 @@ class PluginRegistry:
                     continue
                 try:
                     loader.load_module_from_path(py_file)
-                except Exception:
-                    pass  # Already logged in loader
+                except Exception as e:
+                    log.warning("directory_plugin_load_failed", file=str(py_file), error=str(e))
 
         # Pick up any newly registered plugins
         for name, cls in get_registered_plugins().items():

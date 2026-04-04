@@ -14,7 +14,7 @@ def attach(ctx, pid, hooks):
     """Attach to running process."""
     console = ctx.obj["console"]
     console.print(f"[bold]Attaching to PID {pid}...[/bold]")
-    console.print("[yellow]Instrumentation not yet connected to backend.[/yellow]")
+    console.print("[yellow]Instrumentation requires Frida. Install with: pip install deepview[instrumentation][/yellow]")
 
 @instrument.command()
 @click.option("--program", type=click.Path(exists=True), required=True, help="Program to launch")
@@ -25,7 +25,7 @@ def spawn(ctx, program, hooks, args):
     """Launch and instrument a program."""
     console = ctx.obj["console"]
     console.print(f"[bold]Spawning: {program} {' '.join(args)}[/bold]")
-    console.print("[yellow]Instrumentation not yet connected to backend.[/yellow]")
+    console.print("[yellow]Instrumentation requires Frida. Install with: pip install deepview[instrumentation][/yellow]")
 
 @instrument.command()
 @click.option("--binary", type=click.Path(exists=True), required=True, help="Binary to patch")
@@ -39,7 +39,7 @@ def patch(ctx, binary, output, hooks, strategy):
     console.print(f"[bold]Patching binary: {binary}[/bold]")
     console.print(f"  Strategy: {strategy}")
     console.print(f"  Output: {output}")
-    console.print("[yellow]Binary patching not yet connected to backend.[/yellow]")
+    console.print("[yellow]Instrumentation requires Frida. Install with: pip install deepview[instrumentation][/yellow]")
 
 @instrument.command("analyze")
 @click.option("--binary", type=click.Path(exists=True), required=True, help="Binary to analyze")
@@ -48,4 +48,4 @@ def analyze_binary(ctx, binary):
     """Analyze binary structure."""
     console = ctx.obj["console"]
     console.print(f"[bold]Analyzing binary: {binary}[/bold]")
-    console.print("[yellow]Binary analysis not yet connected to backend.[/yellow]")
+    console.print("[yellow]Instrumentation requires Frida. Install with: pip install deepview[instrumentation][/yellow]")

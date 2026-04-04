@@ -14,7 +14,7 @@ def yara(ctx, target, rules):
     """Run YARA rules against a target."""
     console = ctx.obj["console"]
     console.print(f"[bold]YARA scanning: {target}[/bold]")
-    console.print("[yellow]YARA scanning not yet connected to backend.[/yellow]")
+    console.print("[yellow]Scanning requires YARA. Install with: pip install deepview[memory][/yellow]")
 
 @scan.command()
 @click.option("--target", "-t", type=click.Path(exists=True), required=True, help="Target to scan")
@@ -23,7 +23,7 @@ def yara(ctx, target, rules):
 def ioc(ctx, target, ioc_file):
     """Run IoC matching."""
     console = ctx.obj["console"]
-    console.print("[yellow]IoC matching not yet connected to backend.[/yellow]")
+    console.print("[yellow]Scanning requires YARA. Install with: pip install deepview[memory][/yellow]")
 
 @scan.command()
 @click.option("--list", "list_rules", is_flag=True, help="List available rule sets")

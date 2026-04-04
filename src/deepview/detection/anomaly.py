@@ -32,9 +32,28 @@ class AnomalyDetector:
     - Feature-based heuristic scoring (no ML dependency)
     """
 
-    def __init__(self, use_ml: bool = False):
+    def __init__(
+        self,
+        use_ml: bool = False,
+        rwx_weight: float = 0.15,
+        rwx_cap: float = 0.4,
+        unknown_mod_weight: float = 0.1,
+        unknown_mod_cap: float = 0.3,
+        entropy_threshold: float = 7.5,
+        entropy_score: float = 0.2,
+        handle_threshold: int = 10000,
+        handle_score: float = 0.1,
+    ):
         self._use_ml = use_ml
         self._model = None
+        self._rwx_weight = rwx_weight
+        self._rwx_cap = rwx_cap
+        self._unknown_mod_weight = unknown_mod_weight
+        self._unknown_mod_cap = unknown_mod_cap
+        self._entropy_threshold = entropy_threshold
+        self._entropy_score = entropy_score
+        self._handle_threshold = handle_threshold
+        self._handle_score = handle_score
 
         if use_ml:
             try:
@@ -65,22 +84,22 @@ class AnomalyDetector:
         # RWX memory regions are suspicious
         rwx = features.get("rwx_vad_count", 0)
         if rwx > 0:
-            score += min(rwx * 0.15, 0.4)
+            score += min(rwx * self._rwx_weight, self._rwx_cap)
 
         # Unknown modules are suspicious
         unknown = features.get("unknown_module_count", 0)
         if unknown > 0:
-            score += min(unknown * 0.1, 0.3)
+            score += min(unknown * self._unknown_mod_weight, self._unknown_mod_cap)
 
         # Very high heap entropy may indicate encryption/packing
         entropy = features.get("heap_entropy", 0.0)
-        if entropy > 7.5:
-            score += 0.2
+        if entropy > self._entropy_threshold:
+            score += self._entropy_score
 
         # Extremely high handle count may indicate handle abuse
         handles = features.get("handle_count", 0)
-        if handles > 10000:
-            score += 0.1
+        if handles > self._handle_threshold:
+            score += self._handle_score
 
         return min(score, 1.0)
 
@@ -94,7 +113,7 @@ class AnomalyDetector:
             explanations.append(f"{features['rwx_vad_count']} RWX memory regions")
         if features.get("unknown_module_count", 0) > 0:
             explanations.append(f"{features['unknown_module_count']} unknown modules")
-        if features.get("heap_entropy", 0) > 7.5:
+        if features.get("heap_entropy", 0) > self._entropy_threshold:
             explanations.append("high heap entropy")
 
         return AnomalyScore(

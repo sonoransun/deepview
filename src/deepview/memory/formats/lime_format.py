@@ -133,12 +133,20 @@ class LiMEMemoryLayer(DataLayer):
     def scan(self, scanner: PatternScanner, progress_callback: Callable | None = None) -> Iterator[ScanResult]:
         total_size = sum(r.end - r.start + 1 for r in self._ranges)
         scanned = 0
+        chunk_size = 4 * 1024 * 1024  # 4 MiB
+        overlap = 4096  # 4 KiB overlap to catch patterns at chunk boundaries
         for r in self._ranges:
             size = r.end - r.start + 1
-            self._file.seek(r.file_offset)
-            data = self._file.read(size)
-            for result in scanner.scan(data, offset=r.start):
-                yield result
+            range_offset = 0
+            while range_offset < size:
+                read_size = min(chunk_size, size - range_offset)
+                self._file.seek(r.file_offset + range_offset)
+                chunk = self._file.read(read_size)
+                for result in scanner.scan(chunk, offset=r.start + range_offset):
+                    yield result
+                if range_offset + read_size >= size:
+                    break
+                range_offset += read_size - overlap
             scanned += size
             if progress_callback:
                 progress_callback(scanned / total_size)
@@ -151,4 +159,7 @@ class LiMEMemoryLayer(DataLayer):
         return self
 
     def __exit__(self, *args):
+        self.close()
+
+    def __del__(self):
         self.close()

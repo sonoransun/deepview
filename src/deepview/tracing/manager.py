@@ -41,22 +41,22 @@ class TraceManager:
                 )
                 if backend._available:
                     backends.append(backend)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("backend_unavailable", backend="ebpf", reason=str(e))
         elif platform == Platform.MACOS:
             try:
                 from deepview.tracing.providers.dtrace import DTraceBackend
                 backend = DTraceBackend()
                 if backend._available:
                     backends.append(backend)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("backend_unavailable", backend="dtrace", reason=str(e))
         elif platform == Platform.WINDOWS:
             try:
                 from deepview.tracing.providers.etw import ETWBackend
                 backends.append(ETWBackend())
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("backend_unavailable", backend="etw", reason=str(e))
 
         return backends
 

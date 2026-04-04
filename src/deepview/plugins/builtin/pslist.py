@@ -23,7 +23,7 @@ class ProcessListPlugin(DeepViewPlugin):
         from deepview.memory.manager import MemoryManager
         from pathlib import Path
 
-        config = self._config or {}
+        config = self.config or {}
         image_path = config.get("image_path")
         engine_name = config.get("engine", "auto")
         pid_filter = config.get("pid")
@@ -34,7 +34,7 @@ class ProcessListPlugin(DeepViewPlugin):
                 rows=[{"Error": "No image path provided"}],
             )
 
-        manager = MemoryManager(self._context)
+        manager = MemoryManager(self.context)
 
         try:
             engine = manager.get_engine(engine_name)

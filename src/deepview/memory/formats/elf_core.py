@@ -172,3 +172,6 @@ class ELFCoreLayer(DataLayer):
 
     def __exit__(self, *args):
         self.close()
+
+    def __del__(self):
+        self.close()

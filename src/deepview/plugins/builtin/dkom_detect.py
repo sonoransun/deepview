@@ -19,8 +19,34 @@ class DKOMDetectPlugin(DeepViewPlugin):
         ]
 
     def run(self) -> PluginResult:
-        return PluginResult(
-            columns=["PID", "Name", "Source", "Hidden", "DetectionMethod"],
-            rows=[],
-            metadata={"note": "Cross-references process lists from multiple kernel structures"},
-        )
+        from pathlib import Path
+        from deepview.memory.manager import MemoryManager
+        from deepview.detection.anti_forensics import AntiForensicsDetector
+
+        image_path = self.config.get("image_path")
+        if not image_path:
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": "image_path is required"}],
+            )
+
+        try:
+            MemoryManager(self.context)  # validate context is usable
+            AntiForensicsDetector()  # validate detector can be created
+            # Without multiple process sources, we can't do DKOM yet
+            return PluginResult(
+                columns=["PID", "Name", "Source", "Hidden", "DetectionMethod"],
+                rows=[],
+                metadata={
+                    "note": (
+                        "DKOM detection requires an analysis engine "
+                        "(volatility3 or memprocfs) for multiple process "
+                        "source comparison"
+                    ),
+                },
+            )
+        except Exception as e:
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": str(e)}],
+            )

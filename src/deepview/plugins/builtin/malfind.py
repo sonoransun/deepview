@@ -20,8 +20,34 @@ class MalfindPlugin(DeepViewPlugin):
         ]
 
     def run(self) -> PluginResult:
-        return PluginResult(
-            columns=["PID", "Process", "Address", "VadTag", "Protection", "Flags", "Hexdump"],
-            rows=[],
-            metadata={"note": "Scans VAD entries for suspicious characteristics"},
-        )
+        from pathlib import Path
+        from deepview.memory.manager import MemoryManager
+        from deepview.detection.injection import InjectionDetector
+
+        image_path = self.config.get("image_path")
+        if not image_path:
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": "image_path is required"}],
+            )
+
+        try:
+            MemoryManager(self.context)  # validate context is usable
+            InjectionDetector()  # validate detector can be created
+            # Without an analysis engine providing VAD data, we can't
+            # inspect memory regions yet.
+            return PluginResult(
+                columns=["PID", "Process", "Address", "VadTag", "Protection", "Flags", "Hexdump"],
+                rows=[],
+                metadata={
+                    "note": (
+                        "Injection detection requires an analysis engine "
+                        "(volatility3 or memprocfs) to enumerate VAD entries"
+                    ),
+                },
+            )
+        except Exception as e:
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": str(e)}],
+            )

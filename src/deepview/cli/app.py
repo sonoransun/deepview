@@ -57,7 +57,13 @@ def list_plugins(ctx, category):
     context: AnalysisContext = ctx.obj["context"]
     console: Console = ctx.obj["console"]
     from deepview.core.types import PluginCategory
-    cat = PluginCategory(category) if category else None
+    cat = None
+    if category:
+        try:
+            cat = PluginCategory(category)
+        except ValueError:
+            console.print(f"[red]Unknown category: {category}[/red]")
+            return
     plugins = context.plugins.list_plugins(cat)
     if not plugins:
         console.print("[dim]No plugins found.[/dim]")

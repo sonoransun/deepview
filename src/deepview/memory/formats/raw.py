@@ -21,7 +21,7 @@ class RawMemoryLayer(DataLayer):
         self._path = path
         self._name = name or path.name
         self._size = path.stat().st_size
-        self._file = open(path, "r+b" if path.stat().st_size > 0 else "rb")
+        self._file = open(path, "rb")
         self._mmap = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
 
     def read(self, offset: int, length: int, pad: bool = False) -> bytes:
@@ -71,10 +71,15 @@ class RawMemoryLayer(DataLayer):
             offset = end - overlap if end < self._size else end
 
     def close(self) -> None:
-        if self._mmap:
-            self._mmap.close()
+        try:
+            if self._mmap:
+                self._mmap.close()
+        except ValueError:
+            pass  # already closed
+        self._mmap = None
         if self._file:
             self._file.close()
+            self._file = None
 
     def __enter__(self):
         return self

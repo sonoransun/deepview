@@ -5,7 +5,12 @@ from pathlib import Path
 from deepview.core.context import AnalysisContext
 from deepview.core.config import DeepViewConfig
 from deepview.core.events import EventBus
+from deepview.core.logging import setup_logging
 from deepview.core.types import Platform
+
+# Ensure structlog is configured for the test session so module-level
+# loggers don't write to a closed stderr handle.
+setup_logging("warning")
 
 @pytest.fixture
 def config():

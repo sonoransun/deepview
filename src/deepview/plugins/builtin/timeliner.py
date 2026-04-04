@@ -18,8 +18,39 @@ class TimelinerPlugin(DeepViewPlugin):
         ]
 
     def run(self) -> PluginResult:
-        return PluginResult(
-            columns=["Timestamp", "Type", "Description", "Source"],
-            rows=[],
-            metadata={"note": "Correlates timestamps across memory artifacts"},
-        )
+        image_path = self.config.get("image_path")
+        if not image_path:
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": "image_path is required"}],
+            )
+
+        try:
+            rows: list[dict] = []
+            # Gather any artifacts already collected in the context
+            for category in self.context.artifacts.categories():
+                for artifact in self.context.artifacts.get(category):
+                    ts = artifact.get("timestamp", "")
+                    desc = artifact.get("description", artifact.get("name", ""))
+                    rows.append(
+                        {
+                            "Timestamp": str(ts),
+                            "Type": category,
+                            "Description": str(desc),
+                            "Source": artifact.get("source", "context"),
+                        }
+                    )
+
+            # Sort by timestamp if available
+            rows.sort(key=lambda r: r["Timestamp"])
+
+            return PluginResult(
+                columns=["Timestamp", "Type", "Description", "Source"],
+                rows=rows,
+                metadata={"total_artifacts": len(rows)},
+            )
+        except Exception as e:
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": str(e)}],
+            )

@@ -49,7 +49,13 @@ class PageTableWalkPlugin(DeepViewPlugin):
         walker = PageTableWalker(layer)
 
         cr3_str = self.config.get("cr3")
-        limit = int(self.config.get("limit", 1000))
+        try:
+            limit = int(self.config.get("limit", 1000))
+        except (TypeError, ValueError):
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": f"Invalid limit value: {self.config.get('limit')}"}],
+            )
 
         if cr3_str:
             cr3 = int(cr3_str, 16) if isinstance(cr3_str, str) else int(cr3_str)

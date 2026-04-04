@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import threading
 from collections import defaultdict
 from typing import Any, Callable
 
@@ -63,34 +64,43 @@ class EventBus:
     def __init__(self):
         self._handlers: dict[type[Event], list[Callable]] = defaultdict(list)
         self._async_handlers: dict[type[Event], list[Callable]] = defaultdict(list)
+        self._lock = threading.Lock()
 
     def subscribe(self, event_type: type[Event], handler: Callable) -> None:
         """Register a synchronous handler for an event type."""
-        self._handlers[event_type].append(handler)
+        with self._lock:
+            self._handlers[event_type].append(handler)
 
     def subscribe_async(self, event_type: type[Event], handler: Callable) -> None:
         """Register an async handler for an event type."""
-        self._async_handlers[event_type].append(handler)
+        with self._lock:
+            self._async_handlers[event_type].append(handler)
 
     def unsubscribe(self, event_type: type[Event], handler: Callable) -> None:
         """Remove a handler."""
-        if handler in self._handlers[event_type]:
-            self._handlers[event_type].remove(handler)
-        if handler in self._async_handlers[event_type]:
-            self._async_handlers[event_type].remove(handler)
+        with self._lock:
+            if handler in self._handlers[event_type]:
+                self._handlers[event_type].remove(handler)
+            if handler in self._async_handlers[event_type]:
+                self._async_handlers[event_type].remove(handler)
 
     def publish(self, event: Event) -> None:
         """Publish event to all synchronous handlers."""
-        for handler in self._handlers.get(type(event), []):
+        with self._lock:
+            exact = list(self._handlers.get(type(event), []))
+            parent_handlers = []
+            for event_type, handlers in self._handlers.items():
+                if event_type is not type(event) and isinstance(event, event_type):
+                    parent_handlers.extend(handlers)
+        for handler in exact:
             handler(event)
-        # Also check parent classes
-        for event_type, handlers in self._handlers.items():
-            if event_type is not type(event) and isinstance(event, event_type):
-                for handler in handlers:
-                    handler(event)
+        for handler in parent_handlers:
+            handler(event)
 
     async def publish_async(self, event: Event) -> None:
         """Publish event to both sync and async handlers."""
         self.publish(event)
-        for handler in self._async_handlers.get(type(event), []):
+        with self._lock:
+            async_handlers = list(self._async_handlers.get(type(event), []))
+        for handler in async_handlers:
             await handler(event)

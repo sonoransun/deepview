@@ -33,20 +33,20 @@ class VMManager:
             try:
                 from deepview.vm.connectors.qemu_kvm import QemuKVMConnector
                 connector_classes.append(QemuKVMConnector)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("connector_import_failed", connector="qemu_kvm", reason=str(e))
 
         try:
             from deepview.vm.connectors.virtualbox import VirtualBoxConnector
             connector_classes.append(VirtualBoxConnector)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("connector_import_failed", connector="virtualbox", reason=str(e))
 
         try:
             from deepview.vm.connectors.vmware import VMwareConnector
             connector_classes.append(VMwareConnector)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("connector_import_failed", connector="vmware", reason=str(e))
 
         for cls in connector_classes:
             try:
@@ -55,8 +55,8 @@ class VMManager:
                     name = conn.connector_name()
                     self._connectors[name] = conn
                     log.info("connector_available", connector=name)
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("connector_init_failed", connector=cls.__name__, error=str(e))
 
     def get_connector(self, name: str = "auto") -> VMConnector:
         if name == "auto":

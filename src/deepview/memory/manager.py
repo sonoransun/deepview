@@ -34,8 +34,8 @@ class MemoryManager:
             if engine.is_available():
                 self._engines["volatility"] = engine
                 log.info("engine_available", engine="volatility")
-        except Exception:
-            log.debug("engine_unavailable", engine="volatility")
+        except Exception as e:
+            log.debug("engine_unavailable", engine="volatility", reason=str(e))
 
         try:
             from deepview.memory.analysis.memprocfs import MemProcFSEngine
@@ -43,8 +43,8 @@ class MemoryManager:
             if engine.is_available():
                 self._engines["memprocfs"] = engine
                 log.info("engine_available", engine="memprocfs")
-        except Exception:
-            log.debug("engine_unavailable", engine="memprocfs")
+        except Exception as e:
+            log.debug("engine_unavailable", engine="memprocfs", reason=str(e))
 
     def _detect_providers(self) -> None:
         """Detect available acquisition providers."""
@@ -58,31 +58,31 @@ class MemoryManager:
             try:
                 from deepview.memory.acquisition.avml import AVMLProvider
                 provider_classes.append(AVMLProvider)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("provider_import_failed", provider="avml", reason=str(e))
             try:
                 from deepview.memory.acquisition.lime import LiMEProvider
                 provider_classes.append(LiMEProvider)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("provider_import_failed", provider="lime", reason=str(e))
         elif platform == Platform.MACOS:
             try:
                 from deepview.memory.acquisition.osxpmem import OSXPmemProvider
                 provider_classes.append(OSXPmemProvider)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("provider_import_failed", provider="osxpmem", reason=str(e))
         elif platform == Platform.WINDOWS:
             try:
                 from deepview.memory.acquisition.winpmem import WinPmemProvider
                 provider_classes.append(WinPmemProvider)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("provider_import_failed", provider="winpmem", reason=str(e))
 
         try:
             from deepview.memory.acquisition.live import LiveMemoryProvider
             provider_classes.append(LiveMemoryProvider)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("provider_import_failed", provider="live", reason=str(e))
 
         for cls in provider_classes:
             try:
@@ -90,11 +90,15 @@ class MemoryManager:
                 if provider.is_available():
                     self._providers[provider.provider_name()] = provider
                     log.info("provider_available", provider=provider.provider_name())
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("provider_init_failed", provider=cls.__name__, error=str(e))
 
     def detect_format(self, path: Path) -> DumpFormat:
         """Auto-detect the format of a memory dump file."""
+        if not path.exists():
+            raise FormatError(f"File not found: {path}")
+        if not path.is_file():
+            raise FormatError(f"Not a file: {path}")
         with open(path, "rb") as f:
             magic = f.read(8)
 

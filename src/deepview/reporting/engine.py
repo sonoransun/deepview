@@ -1,5 +1,6 @@
 """Report generation engine."""
 from __future__ import annotations
+import html as html_mod
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -118,14 +119,14 @@ class ReportEngine:
 <body>
     <div class="container">
         <h1>Deep View Forensic Report</h1>
-        <p class="meta">Generated: {report['generated_at']} | Session: {report['session_id']}</p>
+        <p class="meta">Generated: {html_mod.escape(str(report['generated_at']))} | Session: {html_mod.escape(str(report['session_id']))}</p>
 
         <h2>Platform</h2>
         <table>
             <tr><th>Property</th><th>Value</th></tr>
-            <tr><td>OS</td><td>{report['platform']['os']}</td></tr>
-            <tr><td>Architecture</td><td>{report['platform']['arch']}</td></tr>
-            <tr><td>Kernel</td><td>{report['platform']['kernel']}</td></tr>
+            <tr><td>OS</td><td>{html_mod.escape(str(report['platform']['os']))}</td></tr>
+            <tr><td>Architecture</td><td>{html_mod.escape(str(report['platform']['arch']))}</td></tr>
+            <tr><td>Kernel</td><td>{html_mod.escape(str(report['platform']['kernel']))}</td></tr>
         </table>
 """
 
@@ -133,13 +134,13 @@ class ReportEngine:
         if artifacts:
             html += "        <h2>Artifacts</h2>\n"
             for category, items in artifacts.items():
-                html += f"        <h3>{category.title()}</h3>\n"
+                html += f"        <h3>{html_mod.escape(category.title())}</h3>\n"
                 if items:
                     keys = list(items[0].keys()) if items else []
                     html += "        <table>\n"
-                    html += "            <tr>" + "".join(f"<th>{k}</th>" for k in keys) + "</tr>\n"
+                    html += "            <tr>" + "".join(f"<th>{html_mod.escape(str(k))}</th>" for k in keys) + "</tr>\n"
                     for item in items:
-                        html += "            <tr>" + "".join(f"<td>{item.get(k, '')}</td>" for k in keys) + "</tr>\n"
+                        html += "            <tr>" + "".join(f"<td>{html_mod.escape(str(item.get(k, '')))}</td>" for k in keys) + "</tr>\n"
                     html += "        </table>\n"
 
         html += """    </div>

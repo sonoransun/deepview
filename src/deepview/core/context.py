@@ -20,6 +20,9 @@ class LayerRegistry:
         self._layers[name] = layer
 
     def get(self, name: str) -> object:
+        if name not in self._layers:
+            from deepview.core.exceptions import LayerError
+            raise LayerError(f"Layer not found: {name}")
         return self._layers[name]
 
     def list_layers(self) -> list[str]:

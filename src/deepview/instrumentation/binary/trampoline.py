@@ -82,8 +82,18 @@ class TrampolineGenerator:
         raise DisassemblyError(f"Unsupported architecture: {self._arch}")
 
     def generate_trampoline(self, target_addr: int, stolen_bytes: bytes,
-                            hook_addr: int, return_addr: int) -> bytes:
-        """Generate a full trampoline that calls hook, executes stolen bytes, then returns."""
+                            hook_addr: int, return_addr: int,
+                            base_addr: int = 0) -> bytes:
+        """Generate a full trampoline that calls hook, executes stolen bytes, then returns.
+
+        Args:
+            target_addr: Address of the original function being hooked.
+            stolen_bytes: Instructions copied from the original function prologue.
+            hook_addr: Address of the hook function to call.
+            return_addr: Address to jump back to after executing stolen bytes.
+            base_addr: Address where the trampoline will be loaded. Required for
+                correct relative jump calculation.
+        """
         parts = bytearray()
 
         if self._arch == "x86_64":
@@ -119,7 +129,8 @@ class TrampolineGenerator:
             parts.extend(stolen_bytes)
 
             # Jump back to original function (after stolen bytes)
-            jmp_back = self.generate_jump(0, return_addr)  # Placeholder address
+            jmp_from = base_addr + len(parts)
+            jmp_back = self.generate_jump(jmp_from, return_addr)
             parts.extend(jmp_back)
 
         return bytes(parts)

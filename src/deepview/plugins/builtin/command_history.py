@@ -39,7 +39,13 @@ class CommandHistoryPlugin(DeepViewPlugin):
                 rows=[{"Error": "image_path is required"}],
             )
 
-        limit = int(self.config.get("limit", 500))
+        try:
+            limit = int(self.config.get("limit", 500))
+        except (TypeError, ValueError):
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": f"Invalid limit value: {self.config.get('limit')}"}],
+            )
 
         mm = MemoryManager(self.context)
         layer = mm.open_layer(Path(image_path))

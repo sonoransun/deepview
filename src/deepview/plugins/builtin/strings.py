@@ -57,11 +57,17 @@ class StringsPlugin(DeepViewPlugin):
                 rows=[{"Error": "image_path is required"}],
             )
 
-        min_length = int(self.config.get("min_length", 4))
+        try:
+            min_length = int(self.config.get("min_length", 4))
+            entropy_threshold = float(self.config.get("entropy_threshold", 7.5))
+            limit = int(self.config.get("limit", 5000))
+        except (TypeError, ValueError) as e:
+            return PluginResult(
+                columns=["Error"],
+                rows=[{"Error": f"Invalid config value: {e}"}],
+            )
         encodings_str = self.config.get("encodings", "ascii,utf-16-le")
         encodings = [e.strip() for e in encodings_str.split(",")]
-        entropy_threshold = float(self.config.get("entropy_threshold", 7.5))
-        limit = int(self.config.get("limit", 5000))
 
         mm = MemoryManager(self.context)
         layer = mm.open_layer(Path(image_path))

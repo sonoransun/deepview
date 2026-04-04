@@ -17,7 +17,8 @@ class TestLayerRegistry:
     def test_missing_layer(self):
         reg = LayerRegistry()
         import pytest
-        with pytest.raises(KeyError):
+        from deepview.core.exceptions import LayerError
+        with pytest.raises(LayerError):
             reg.get("missing")
 
 class TestArtifactStore:

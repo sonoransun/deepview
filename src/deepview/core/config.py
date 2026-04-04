@@ -77,17 +77,27 @@ class DeepViewConfig(BaseSettings):
     @classmethod
     def load(cls, config_path: Path | None = None) -> DeepViewConfig:
         """Load configuration, merging defaults with config file if present."""
-        if config_path and config_path.exists():
+        from deepview.core.exceptions import ConfigError
+
+        def _load_toml(path: Path) -> DeepViewConfig:
             import tomllib
-            with open(config_path, "rb") as f:
-                data = tomllib.load(f)
-            return cls(**data)
+            try:
+                with open(path, "rb") as f:
+                    data = tomllib.load(f)
+            except tomllib.TOMLDecodeError as e:
+                raise ConfigError(f"Invalid TOML in {path}: {e}") from e
+            except OSError as e:
+                raise ConfigError(f"Cannot read config file {path}: {e}") from e
+            try:
+                return cls(**data)
+            except Exception as e:
+                raise ConfigError(f"Invalid configuration in {path}: {e}") from e
+
+        if config_path and config_path.exists():
+            return _load_toml(config_path)
 
         default_path = Path(user_config_dir(_APP_NAME)) / "config.toml"
         if default_path.exists():
-            import tomllib
-            with open(default_path, "rb") as f:
-                data = tomllib.load(f)
-            return cls(**data)
+            return _load_toml(default_path)
 
         return cls()

@@ -13,7 +13,7 @@ def vm():
 def list_vms(ctx, hypervisor, uri):
     """List available virtual machines."""
     console = ctx.obj["console"]
-    console.print("[yellow]VM listing not yet connected to backend.[/yellow]")
+    console.print("[yellow]VM introspection requires a hypervisor (libvirt, VirtualBox, or VMware). Run 'deepview doctor' to check.[/yellow]")
 
 @vm.command()
 @click.option("--vm-id", required=True, help="VM identifier")
@@ -23,7 +23,7 @@ def snapshot(ctx, vm_id, name):
     """Create VM snapshot."""
     console = ctx.obj["console"]
     console.print(f"[bold]Creating snapshot '{name}' for VM {vm_id}...[/bold]")
-    console.print("[yellow]VM snapshot not yet connected to backend.[/yellow]")
+    console.print("[yellow]VM introspection requires a hypervisor (libvirt, VirtualBox, or VMware). Run 'deepview doctor' to check.[/yellow]")
 
 @vm.command()
 @click.option("--vm-id", required=True, help="VM identifier")
@@ -33,7 +33,7 @@ def extract(ctx, vm_id, output):
     """Extract VM memory/state."""
     console = ctx.obj["console"]
     console.print(f"[bold]Extracting memory from VM {vm_id}...[/bold]")
-    console.print("[yellow]VM extraction not yet connected to backend.[/yellow]")
+    console.print("[yellow]VM introspection requires a hypervisor (libvirt, VirtualBox, or VMware). Run 'deepview doctor' to check.[/yellow]")
 
 @vm.command("analyze")
 @click.option("--vm-id", required=True, help="VM identifier")
@@ -43,4 +43,4 @@ def vm_analyze(ctx, vm_id, plugin):
     """Snapshot and analyze VM in one step."""
     console = ctx.obj["console"]
     console.print(f"[bold]Analyzing VM {vm_id} with plugin {plugin}...[/bold]")
-    console.print("[yellow]VM analysis not yet connected to backend.[/yellow]")
+    console.print("[yellow]VM introspection requires a hypervisor (libvirt, VirtualBox, or VMware). Run 'deepview doctor' to check.[/yellow]")
