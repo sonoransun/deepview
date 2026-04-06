@@ -86,7 +86,10 @@ class PluginRegistry:
             plugin_paths = [str(user_plugin_dir)] + plugin_paths
 
         for path_str in plugin_paths:
-            path = Path(path_str).expanduser()
+            path = Path(path_str).expanduser().resolve()
+            if path.is_symlink():
+                log.warning("refusing_symlink_plugin_dir", path=str(path))
+                continue
             if not path.is_dir():
                 continue
             for py_file in sorted(path.glob("*.py")):

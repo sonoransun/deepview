@@ -45,11 +45,16 @@ class ELFCoreLayer(DataLayer):
         self._file = open(path, "rb")
         self._parse_elf()
 
+    _MAX_PHNUM = 65536  # Reasonable upper bound for program headers.
+
     def _parse_elf(self) -> None:
         """Parse ELF header and program headers."""
+        self._file.seek(0, 2)
+        file_size = self._file.tell()
         self._file.seek(0)
+
         ident = self._file.read(16)
-        if ident[:4] != ELF_MAGIC:
+        if len(ident) < 16 or ident[:4] != ELF_MAGIC:
             raise FormatError("Not a valid ELF file")
 
         elfclass = ident[4]
@@ -58,10 +63,19 @@ class ELFCoreLayer(DataLayer):
 
         # ELF64 header (after ident)
         hdr = self._file.read(48)  # remaining header fields
+        if len(hdr) < 48:
+            raise FormatError("Truncated ELF header")
+
         e_type, e_machine, e_version = struct.unpack_from("<HHI", hdr, 0)
         e_phoff = struct.unpack_from("<Q", hdr, 16)[0]
         e_phentsize = struct.unpack_from("<H", hdr, 34)[0]
         e_phnum = struct.unpack_from("<H", hdr, 36)[0]
+
+        if e_phnum > self._MAX_PHNUM:
+            raise FormatError(f"Too many program headers: {e_phnum} (max {self._MAX_PHNUM})")
+
+        if e_phoff + e_phnum * e_phentsize > file_size:
+            raise FormatError("Program header table extends past end of file")
 
         # Parse program headers
         self._file.seek(e_phoff)
@@ -77,6 +91,13 @@ class ELFCoreLayer(DataLayer):
                 p_paddr = struct.unpack_from("<Q", phdr_data, 24)[0]
                 p_filesz = struct.unpack_from("<Q", phdr_data, 32)[0]
                 p_memsz = struct.unpack_from("<Q", phdr_data, 40)[0]
+
+                # Validate segment doesn't extend past file.
+                if p_offset + p_filesz > file_size:
+                    raise FormatError(
+                        f"PT_LOAD segment extends past file "
+                        f"(offset=0x{p_offset:x}, size=0x{p_filesz:x}, file_size={file_size})"
+                    )
 
                 self._segments.append(ELFSegment(
                     vaddr=p_vaddr,

@@ -13,9 +13,10 @@ class TestHashBytes:
         result = hash_bytes(b"hello", algorithm="sha256")
         assert result == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
 
-    def test_hash_bytes_md5(self):
-        result = hash_bytes(b"hello", algorithm="md5")
-        assert result == "5d41402abc4b2a76b9719d911017c592"
+    def test_hash_bytes_md5_rejected(self):
+        import pytest
+        with pytest.raises(ValueError, match="not allowed"):
+            hash_bytes(b"hello", algorithm="md5")
 
 
 class TestHashFile:

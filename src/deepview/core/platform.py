@@ -48,6 +48,11 @@ class PlatformInfo:
         if shutil.which("frida"):
             caps.add("frida")
 
+        if shutil.which("analyzeHeadless") or shutil.which("analyzeHeadless.bat"):
+            caps.add("ghidra")
+        if shutil.which("hopper") or shutil.which("hopperv4"):
+            caps.add("hopper")
+
         return cls(os=os_platform, arch=arch, kernel_version=kernel, capabilities=caps)
 
 

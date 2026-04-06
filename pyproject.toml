@@ -54,6 +54,10 @@ sidechannel = [
     "numpy>=1.24",
     "scipy>=1.10",
 ]
+disassembly = [
+    "capstone>=5.0",
+    "pyhidra>=1.0",
+]
 all = [
     "deepview[memory]",
     "deepview[tracing]",
@@ -66,6 +70,7 @@ all = [
     "deepview[ml]",
     "deepview[sigma]",
     "deepview[sidechannel]",
+    "deepview[disassembly]",
 ]
 dev = [
     "pytest>=7.0",
@@ -101,4 +106,6 @@ markers = [
     "requires_root: marks tests that require root/admin privileges",
     "integration: marks integration tests",
     "slow: marks slow-running tests",
+    "requires_ghidra: marks tests that require Ghidra installation",
+    "requires_hopper: marks tests that require Hopper installation",
 ]

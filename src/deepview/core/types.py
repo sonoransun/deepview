@@ -72,6 +72,13 @@ class PluginCategory(str, enum.Enum):
     CUSTOM = "custom"
 
 
+class DisassemblyBackend(str, enum.Enum):
+    GHIDRA = "ghidra"
+    HOPPER = "hopper"
+    CAPSTONE = "capstone"
+    AUTO = "auto"
+
+
 # ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
@@ -158,3 +165,64 @@ class ModuleInfo(BaseModel):
     base_address: int
     size: int
     path: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Disassembly / reverse-engineering models
+# ---------------------------------------------------------------------------
+
+
+class DisassembledInstruction(BaseModel):
+    address: int
+    mnemonic: str
+    op_str: str
+    bytes_hex: str
+    size: int
+    comment: str = ""
+
+
+class DecompiledFunction(BaseModel):
+    name: str
+    address: int
+    source: str
+    language: str = "c"
+
+
+class FunctionRecord(BaseModel):
+    name: str
+    address: int
+    size: int = 0
+    calling_convention: str = ""
+    return_type: str = ""
+    parameters: list[str] = Field(default_factory=list)
+
+
+class CrossReference(BaseModel):
+    from_address: int
+    to_address: int
+    ref_type: str  # "call", "data", "jump", "offset"
+    from_function: str = ""
+    to_function: str = ""
+
+
+class CFGBlock(BaseModel):
+    address: int
+    size: int
+    instructions: list[DisassembledInstruction] = Field(default_factory=list)
+    successors: list[int] = Field(default_factory=list)
+    predecessors: list[int] = Field(default_factory=list)
+
+
+class ControlFlowGraph(BaseModel):
+    function_name: str
+    function_address: int
+    blocks: list[CFGBlock] = Field(default_factory=list)
+    edge_count: int = 0
+
+
+class StringRecord(BaseModel):
+    address: int
+    value: str
+    encoding: str = "utf-8"
+    section: str = ""
+    xref_count: int = 0

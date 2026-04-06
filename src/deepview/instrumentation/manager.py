@@ -96,6 +96,17 @@ class InstrumentationManager:
         log.info("reassembling", hooks=count, strategy=strategy)
         return builder.build()
 
+    def decompile_function(self, path: Path, function: str,
+                           engine: str = "auto") -> str:
+        """Decompile a function via the disassembly subsystem."""
+        from deepview.disassembly.manager import DisassemblyManager
+
+        dm = DisassemblyManager(self._context)
+        try:
+            return dm.decompile(path, function, engine)
+        finally:
+            dm.close_all()
+
     @property
     def event_bus(self) -> TraceEventBus:
         return self._bus

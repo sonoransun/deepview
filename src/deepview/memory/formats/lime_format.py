@@ -38,9 +38,15 @@ class LiMEMemoryLayer(DataLayer):
         self._file = open(path, "rb")
         self._parse_headers()
 
+    # Maximum reasonable range size (1 TB) to guard against crafted dumps.
+    _MAX_RANGE_SIZE = 1 << 40
+
     def _parse_headers(self) -> None:
         """Parse all LiME range headers."""
+        self._file.seek(0, 2)
+        file_size = self._file.tell()
         self._file.seek(0)
+
         while True:
             header_data = self._file.read(LIME_HEADER_SIZE)
             if len(header_data) < LIME_HEADER_SIZE:
@@ -50,8 +56,26 @@ class LiMEMemoryLayer(DataLayer):
             if magic != LIME_MAGIC:
                 raise FormatError(f"Invalid LiME magic: {magic:#x} (expected {LIME_MAGIC:#x})")
 
+            if end < start:
+                raise FormatError(
+                    f"Invalid LiME range: end (0x{end:x}) < start (0x{start:x})"
+                )
+
             data_offset = self._file.tell()
             data_size = end - start + 1
+
+            if data_size > self._MAX_RANGE_SIZE:
+                raise FormatError(
+                    f"LiME range too large: {data_size} bytes (max {self._MAX_RANGE_SIZE})"
+                )
+
+            # Ensure the data region doesn't exceed the actual file size.
+            if data_offset + data_size > file_size:
+                raise FormatError(
+                    f"LiME range extends past end of file "
+                    f"(data_offset={data_offset}, data_size={data_size}, file_size={file_size})"
+                )
+
             self._ranges.append(LiMERange(start=start, end=end, file_offset=data_offset))
 
             # Skip to next header

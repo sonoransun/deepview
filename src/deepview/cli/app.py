@@ -40,6 +40,7 @@ from deepview.cli.commands.trace import trace
 from deepview.cli.commands.instrument import instrument
 from deepview.cli.commands.scan import scan
 from deepview.cli.commands.report import report
+from deepview.cli.commands.disassemble import disassemble
 
 main.add_command(memory)
 main.add_command(vm)
@@ -47,6 +48,7 @@ main.add_command(trace)
 main.add_command(instrument)
 main.add_command(scan)
 main.add_command(report)
+main.add_command(disassemble)
 
 # Add plugin list command at root level
 @main.command("plugins")

@@ -54,6 +54,17 @@ class SideChannelConfig(BaseSettings):
     chipwhisperer_serial: str = ""
     sample_rate_hz: int = 20_000_000
 
+
+class DisassemblyConfig(BaseSettings):
+    default_engine: str = "auto"
+    ghidra_install_dir: str = ""
+    ghidra_project_dir: str = ""
+    ghidra_jvm_args: list[str] = Field(default_factory=lambda: ["-Xmx4g"])
+    ghidra_analysis_timeout: int = 600
+    hopper_cli_path: str = ""
+    hopper_license_path: str = ""
+    capstone_detail_mode: bool = True
+
 class DeepViewConfig(BaseSettings):
     model_config = {"env_prefix": "DEEPVIEW_"}
 
@@ -73,14 +84,34 @@ class DeepViewConfig(BaseSettings):
     firmware: FirmwareConfig = Field(default_factory=FirmwareConfig)
     gpu: GPUConfig = Field(default_factory=GPUConfig)
     sidechannel: SideChannelConfig = Field(default_factory=SideChannelConfig)
+    disassembly: DisassemblyConfig = Field(default_factory=DisassemblyConfig)
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> DeepViewConfig:
         """Load configuration, merging defaults with config file if present."""
         from deepview.core.exceptions import ConfigError
 
+        _MAX_CONFIG_SIZE = 10 * 1024 * 1024  # 10 MB
+
+        def _validate_config_file(path: Path) -> None:
+            """Security checks before loading a config file."""
+            resolved = path.resolve()
+            if path.is_symlink():
+                raise ConfigError(f"Config file is a symlink (rejected): {path}")
+            if not resolved.is_file():
+                raise ConfigError(f"Config path is not a regular file: {path}")
+            try:
+                size = resolved.stat().st_size
+            except OSError as e:
+                raise ConfigError(f"Cannot stat config file {path}: {e}") from e
+            if size > _MAX_CONFIG_SIZE:
+                raise ConfigError(
+                    f"Config file too large ({size} bytes, max {_MAX_CONFIG_SIZE}): {path}"
+                )
+
         def _load_toml(path: Path) -> DeepViewConfig:
             import tomllib
+            _validate_config_file(path)
             try:
                 with open(path, "rb") as f:
                     data = tomllib.load(f)

@@ -165,3 +165,25 @@ class HardwareError(DeepViewError):
 
 class BaselineError(DeepViewError):
     """Baseline profiling or comparison failure."""
+
+
+# -- Disassembly / Reverse Engineering --------------------------------------
+
+class ReverseEngineeringError(DeepViewError):
+    """Base exception for disassembly/reverse-engineering errors."""
+
+
+class EngineNotAvailableError(ReverseEngineeringError):
+    """Disassembly engine is not installed or not found."""
+
+
+class DecompilationError(ReverseEngineeringError):
+    """Decompilation failure."""
+
+
+class AnalysisTimeoutError(ReverseEngineeringError):
+    """Headless analysis exceeded time limit."""
+
+
+class ProjectError(ReverseEngineeringError):
+    """Ghidra/Hopper project creation or loading failure."""

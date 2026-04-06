@@ -9,6 +9,7 @@ from deepview.interfaces.scanner import PatternScanner
 from deepview.interfaces.vm_connector import VMConnector
 from deepview.interfaces.plugin import DeepViewPlugin
 from deepview.interfaces.renderer import ResultRenderer
+from deepview.interfaces.disassembler import DisassemblyEngine, DisassemblySession
 
 __all__ = [
     "DataLayer",
@@ -21,4 +22,6 @@ __all__ = [
     "VMConnector",
     "DeepViewPlugin",
     "ResultRenderer",
+    "DisassemblyEngine",
+    "DisassemblySession",
 ]

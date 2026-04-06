@@ -23,84 +23,84 @@ Deep View includes independent page table reconstruction (CR3 → PML4 → PT wa
 
 ```mermaid
 graph TB
-    CLI["CLI Interface<br/>(Click + Rich)"]
-    CTX["Analysis Context"]
-    EB["Event Bus<br/>(Pub/Sub)"]
+    CLI["CLI Interface<br/>(Click + Rich)"]:::core
+    CTX["Analysis Context"]:::core
+    EB["Event Bus<br/>(Pub/Sub)"]:::core
 
     subgraph Core["Core Framework"]
         CTX
         EB
-        CFG["Config<br/>(Pydantic)"]
-        PLT["Platform<br/>Detection"]
-        PR["Plugin Registry<br/>(3-tier discovery)"]
+        CFG["Config<br/>(Pydantic)"]:::core
+        PLT["Platform<br/>Detection"]:::core
+        PR["Plugin Registry<br/>(3-tier discovery)"]:::core
     end
 
     subgraph Memory["Memory Forensics"]
-        MM["Memory Manager"]
-        ACQ["Acquisition<br/>LiME | AVML | WinPmem | OSXPmem"]
-        FMT["Format Parsers<br/>Raw | LiME | ELF Core | Crashdump"]
-        VOL["Volatility 3<br/>Engine"]
-        MPF["MemProcFS<br/>Engine"]
-        SYM["Symbol Manager<br/>(dwarf2json)"]
-        PTW["Page Table Walker<br/>(CR3 → PML4 → PT)"]
-        VAL["Virtual Address Layer"]
+        MM["Memory Manager"]:::analysis
+        ACQ["Acquisition<br/>LiME | AVML | WinPmem | OSXPmem"]:::source
+        FMT["Format Parsers<br/>Raw | LiME | ELF Core | Crashdump"]:::analysis
+        VOL["Volatility 3<br/>Engine"]:::analysis
+        MPF["MemProcFS<br/>Engine"]:::analysis
+        SYM["Symbol Manager<br/>(dwarf2json)"]:::analysis
+        PTW["Page Table Walker<br/>(CR3 → PML4 → PT)"]:::analysis
+        VAL["Virtual Address Layer"]:::analysis
     end
 
     subgraph Hardware["Hardware-Assisted Extraction"]
-        DMA["DMA Acquisition<br/>(PCILeech, Thunderbolt, FireWire)"]
-        CB["Cold Boot<br/>(DRAM remanence)"]
-        JTAG["JTAG / Chip-Off / ISP<br/>(mobile, embedded, IoT)"]
-        SPI["SPI Flash<br/>(Bus Pirate, Dediprog)"]
-        GPU["GPU Memory<br/>(CUDA, OpenCL)"]
+        DMA["DMA Acquisition<br/>(PCILeech, Thunderbolt, FireWire)"]:::hardware
+        CB["Cold Boot<br/>(DRAM remanence)"]:::hardware
+        JTAG["JTAG / Chip-Off / ISP<br/>(mobile, embedded, IoT)"]:::hardware
+        SPI["SPI Flash<br/>(Bus Pirate, Dediprog)"]:::hardware
+        GPU["GPU Memory<br/>(CUDA, OpenCL)"]:::hardware
     end
 
     subgraph Tracing["System Tracing"]
-        TM["Trace Manager"]
-        BPF["eBPF/BCC<br/>(Linux)"]
-        DT["DTrace<br/>(macOS)"]
-        ETW["ETW<br/>(Windows)"]
-        IPT["Intel PT<br/>(branch trace)"]
-        CS["ARM CoreSight"]
-        TEB["Trace Event Bus<br/>(async queues)"]
+        TM["Trace Manager"]:::instrument
+        BPF["eBPF/BCC<br/>(Linux)"]:::instrument
+        DT["DTrace<br/>(macOS)"]:::instrument
+        ETW["ETW<br/>(Windows)"]:::instrument
+        IPT["Intel PT<br/>(branch trace)"]:::instrument
+        CS["ARM CoreSight"]:::instrument
+        TEB["Trace Event Bus<br/>(async queues)"]:::instrument
     end
 
     subgraph Instrument["Instrumentation"]
-        IM["Instrumentation Manager"]
-        FE["Frida Engine<br/>(dynamic hooks)"]
-        BA["Binary Analyzer<br/>(LIEF)"]
-        RE["Reassembler<br/>(trampoline injection)"]
+        IM["Instrumentation Manager"]:::instrument
+        FE["Frida Engine<br/>(dynamic hooks)"]:::instrument
+        BA["Binary Analyzer<br/>(LIEF)"]:::instrument
+        RE["Reassembler<br/>(trampoline injection)"]:::instrument
     end
 
     subgraph VM["VM Introspection"]
-        VMM["VM Manager"]
-        QEMU["QEMU/KVM<br/>(libvirt)"]
-        VBOX["VirtualBox<br/>(vboxmanage)"]
-        VMW["VMware<br/>(vmrun)"]
-        VMI["LibVMI / DRAKVUF<br/>(live introspection)"]
+        VMM["VM Manager"]:::analysis
+        QEMU["QEMU/KVM<br/>(libvirt)"]:::analysis
+        VBOX["VirtualBox<br/>(vboxmanage)"]:::analysis
+        VMW["VMware<br/>(vmrun)"]:::analysis
+        VMI["LibVMI / DRAKVUF<br/>(live introspection)"]:::analysis
     end
 
     subgraph Detection["Detection & Scanning"]
-        AF["Anti-Forensics<br/>(DKOM, hooks, PatchGuard)"]
-        INJ["Injection Detection<br/>(T1055)"]
-        EK["Key Scanner<br/>(AES, RSA, BitLocker, TLS)"]
-        AD["Anomaly Detection<br/>(heuristic + ML)"]
-        RK["Rootkit Detection<br/>(hypervisor, bootkit)"]
-        YS["YARA Scanner"]
-        SC["String Carver<br/>(multi-encoding)"]
-        IOC["IoC Engine"]
+        AF["Anti-Forensics<br/>(DKOM, hooks, PatchGuard)"]:::detect
+        INJ["Injection Detection<br/>(T1055)"]:::detect
+        EK["Key Scanner<br/>(AES, RSA, BitLocker, TLS)"]:::detect
+        AD["Anomaly Detection<br/>(heuristic + ML)"]:::detect
+        RK["Rootkit Detection<br/>(hypervisor, bootkit)"]:::detect
+        YS["YARA Scanner"]:::detect
+        SC["String Carver<br/>(multi-encoding)"]:::detect
+        IOC["IoC Engine"]:::detect
     end
 
     subgraph Artifacts["Volatile Artifact Recovery"]
-        TCP["TCP/IP Stack<br/>Reconstruction"]
-        CMD["Command History<br/>(cmd, PS, bash)"]
-        FW["Firmware / UEFI<br/>Analysis"]
+        TCP["TCP/IP Stack<br/>Reconstruction"]:::detect
+        CMD["Command History<br/>(cmd, PS, bash)"]:::detect
+        FW["Firmware / UEFI<br/>Analysis"]:::detect
     end
 
     subgraph Reporting["Reporting & Export"]
-        RE2["Report Engine<br/>(HTML, Markdown, JSON)"]
-        TL["Timeline Builder"]
-        STIX["STIX 2.1 Export"]
-        ATT["ATT&CK Mapper<br/>(Navigator layers)"]
+        RE2["Report Engine<br/>(HTML, Markdown, JSON)"]:::report
+        TL["Timeline Builder"]:::report
+        STIX["STIX 2.1 Export"]:::report
+        ATT["ATT&CK Mapper<br/>(Navigator layers)"]:::report
     end
 
     CLI --> CTX
@@ -154,6 +154,14 @@ graph TB
     INJ --> ATT
     RK --> ATT
     TL --> RE2
+
+    classDef core fill:#868e96,stroke:#495057,color:#fff
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef hardware fill:#ff8787,stroke:#e03131,color:#1a1a2e
+    classDef instrument fill:#3bc9db,stroke:#1098ad,color:#1a1a2e
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
+    classDef report fill:#69db7c,stroke:#2f9e44,color:#1a1a2e
 ```
 
 ### Data Flow
@@ -161,43 +169,43 @@ graph TB
 ```mermaid
 flowchart LR
     subgraph Sources["Evidence Sources"]
-        LIVE["Live System"]
-        DUMP["Memory Dump"]
-        VMSNAP["VM Snapshot"]
-        BIN["Suspect Binary"]
-        HW["Hardware Target<br/>(PCIe, JTAG, DIMM)"]
-        FW["Firmware<br/>(SPI Flash)"]
-        GPUD["GPU Device"]
+        LIVE["Live System"]:::source
+        DUMP["Memory Dump"]:::source
+        VMSNAP["VM Snapshot"]:::source
+        BIN["Suspect Binary"]:::source
+        HW["Hardware Target<br/>(PCIe, JTAG, DIMM)"]:::hardware
+        FW["Firmware<br/>(SPI Flash)"]:::hardware
+        GPUD["GPU Device"]:::hardware
     end
 
     subgraph Acquire["Acquisition"]
-        A1["LiME / AVML /<br/>WinPmem / OSXPmem"]
-        A2["VM Extract<br/>(virsh, vboxmanage, vmrun)"]
-        A3["DMA / Cold Boot /<br/>JTAG / Chip-Off"]
-        A4["SPI Read<br/>(flashrom, CHIPSEC)"]
-        A5["GPU Dump<br/>(CUDA, OpenCL)"]
+        A1["LiME / AVML /<br/>WinPmem / OSXPmem"]:::source
+        A2["VM Extract<br/>(virsh, vboxmanage, vmrun)"]:::source
+        A3["DMA / Cold Boot /<br/>JTAG / Chip-Off"]:::hardware
+        A4["SPI Read<br/>(flashrom, CHIPSEC)"]:::hardware
+        A5["GPU Dump<br/>(CUDA, OpenCL)"]:::hardware
     end
 
     subgraph Analyze["Analysis Layer"]
-        DL["DataLayer<br/>(abstract memory source)"]
-        PTW["Page Table Walker<br/>(virtual addr translation)"]
-        V3["Volatility 3"]
-        MFS["MemProcFS"]
+        DL["DataLayer<br/>(abstract memory source)"]:::analysis
+        PTW["Page Table Walker<br/>(virtual addr translation)"]:::analysis
+        V3["Volatility 3"]:::analysis
+        MFS["MemProcFS"]:::analysis
     end
 
     subgraph Detect["Detection"]
-        YARA["YARA Rules<br/>(malware, creds, exploits)"]
-        STRCAR["String Carver<br/>(multi-encoding + entropy)"]
-        DET["Detection Modules<br/>(DKOM, injection, keys,<br/>rootkits, bootkits)"]
-        ARTIF["Artifact Recovery<br/>(TCP stack, commands,<br/>clipboard, registry)"]
-        SCORE["Anomaly Scoring"]
+        YARA["YARA Rules<br/>(malware, creds, exploits)"]:::detect
+        STRCAR["String Carver<br/>(multi-encoding + entropy)"]:::detect
+        DET["Detection Modules<br/>(DKOM, injection, keys,<br/>rootkits, bootkits)"]:::detect
+        ARTIF["Artifact Recovery<br/>(TCP stack, commands,<br/>clipboard, registry)"]:::detect
+        SCORE["Anomaly Scoring"]:::detect
     end
 
     subgraph Report["Output"]
-        HTML["HTML Report"]
-        STIXO["STIX 2.1 Bundle"]
-        NAV["ATT&CK Navigator"]
-        CSV["CSV / JSON"]
+        HTML["HTML Report"]:::report
+        STIXO["STIX 2.1 Bundle"]:::report
+        NAV["ATT&CK Navigator"]:::report
+        CSV["CSV / JSON"]:::report
     end
 
     LIVE --> A1 --> DL
@@ -206,7 +214,7 @@ flowchart LR
     HW --> A3 --> DL
     FW --> A4 --> DL
     GPUD --> A5 --> DL
-    BIN --> BA2["Binary Analysis<br/>(LIEF)"]
+    BIN --> BA2["Binary Analysis<br/>(LIEF)"]:::instrument
 
     DL --> PTW --> V3 --> DET
     DL --> MFS --> DET
@@ -219,6 +227,13 @@ flowchart LR
     SCORE --> STIXO
     SCORE --> NAV
     SCORE --> CSV
+
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef hardware fill:#ff8787,stroke:#e03131,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
+    classDef report fill:#69db7c,stroke:#2f9e44,color:#1a1a2e
+    classDef instrument fill:#3bc9db,stroke:#1098ad,color:#1a1a2e
 ```
 
 ---
@@ -244,6 +259,48 @@ flowchart LR
 | **ETW (Windows)** | Kernel provider subscriptions for process, file, network, and memory events |
 | **Unified event schema** | `MonitorEvent` with dual timestamps (monotonic + wall-clock), process context, syscall details, and semantic args |
 | **Filter DSL** | Platform-independent filter expressions with best-effort kernel push-down and user-space residual evaluation |
+
+```mermaid
+flowchart LR
+    subgraph Backends["Platform Backends"]
+        EBPF["eBPF<br/>(Linux)"]:::instrument
+        DTRACE["DTrace<br/>(macOS)"]:::instrument
+        ETW2["ETW<br/>(Windows)"]:::instrument
+    end
+
+    RB["Kernel Ring Buffer"]:::core
+
+    subgraph TEB["TraceEventBus (async fan-out)"]
+        PUB["publish_async()"]:::core
+        Q1["Subscriber Queue 1<br/>(maxlen=10000)"]:::analysis
+        Q2["Subscriber Queue 2<br/>(maxlen=10000)"]:::analysis
+        Q3["Subscriber Queue N<br/>(maxlen=10000)"]:::analysis
+        DROP["Drop Counter<br/>(per-queue)"]:::threat
+    end
+
+    subgraph Consumers["Subscriber Tasks"]
+        C1["Filter + Display<br/>(Rich table)"]:::report
+        C2["Anomaly Detector<br/>(scoring)"]:::detect
+        C3["Event Logger<br/>(JSON export)"]:::report
+    end
+
+    EBPF & DTRACE & ETW2 --> RB
+    RB --> PUB
+    PUB --> Q1 & Q2 & Q3
+    Q1 --> C1
+    Q2 --> C2
+    Q3 --> C3
+    Q1 & Q2 & Q3 -.->|"queue full"| DROP
+
+    classDef core fill:#868e96,stroke:#495057,color:#fff
+    classDef instrument fill:#3bc9db,stroke:#1098ad,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
+    classDef report fill:#69db7c,stroke:#2f9e44,color:#1a1a2e
+    classDef threat fill:#ff6b6b,stroke:#e03131,color:#fff
+```
+
+Each subscriber gets an independent async queue. Slow consumers don't block others --- when a queue is full, events are dropped (not backpressured) and the per-queue drop counter increments. Filters can be pushed down to the kernel backend (e.g., eBPF PID filtering) for efficiency.
 
 ### Application Instrumentation
 
@@ -290,37 +347,37 @@ flowchart LR
 ```mermaid
 flowchart TD
     subgraph HardwareSources["Hardware Acquisition Sources"]
-        PCIE["PCIe / Thunderbolt<br/>(FPGA: Screamer, SP605)"]
-        FW1394["FireWire / IEEE 1394"]
-        DIMM["Physical DIMM<br/>(cold boot)"]
-        JTAGP["JTAG Probe<br/>(OpenOCD, RIFF)"]
-        ISPPR["ISP Probe<br/>(eMMC CMD/CLK/DAT)"]
-        CHIPOFF["Desoldered Flash<br/>(NAND/eMMC programmer)"]
-        SPIHW["SPI Probe<br/>(Bus Pirate, Dediprog)"]
-        GPUDEV["GPU Device<br/>(NVIDIA, AMD)"]
+        PCIE["PCIe / Thunderbolt<br/>(FPGA: Screamer, SP605)"]:::hardware
+        FW1394["FireWire / IEEE 1394"]:::hardware
+        DIMM["Physical DIMM<br/>(cold boot)"]:::hardware
+        JTAGP["JTAG Probe<br/>(OpenOCD, RIFF)"]:::hardware
+        ISPPR["ISP Probe<br/>(eMMC CMD/CLK/DAT)"]:::hardware
+        CHIPOFF["Desoldered Flash<br/>(NAND/eMMC programmer)"]:::hardware
+        SPIHW["SPI Probe<br/>(Bus Pirate, Dediprog)"]:::hardware
+        GPUDEV["GPU Device<br/>(NVIDIA, AMD)"]:::hardware
     end
 
     subgraph Providers["Acquisition Providers"]
-        PCIL["PCILeech<br/>via leechcore"]
-        CBPROV["Cold Boot Provider<br/>(remanence model +<br/>DDR descrambler)"]
-        JTAGPROV["JTAG Provider<br/>(OpenOCD backend)"]
-        COPROV["Chip-Off Provider<br/>(FTL reconstruction)"]
-        ISPPROV["ISP Provider"]
-        SPIPROV["SPI Flash Provider<br/>(flashrom / CHIPSEC)"]
-        GPUPROV["GPU Provider<br/>(CUDA / OpenCL)"]
+        PCIL["PCILeech<br/>via leechcore"]:::source
+        CBPROV["Cold Boot Provider<br/>(remanence model +<br/>DDR descrambler)"]:::source
+        JTAGPROV["JTAG Provider<br/>(OpenOCD backend)"]:::source
+        COPROV["Chip-Off Provider<br/>(FTL reconstruction)"]:::source
+        ISPPROV["ISP Provider"]:::source
+        SPIPROV["SPI Flash Provider<br/>(flashrom / CHIPSEC)"]:::source
+        GPUPROV["GPU Provider<br/>(CUDA / OpenCL)"]:::source
     end
 
     subgraph Layers["DataLayer Implementations"]
-        DMA_LAYER["DMA Live Layer<br/>(real-time read)"]
-        CB_LAYER["Cold Boot Layer<br/>(decay confidence)"]
-        NAND_LAYER["NAND Layer<br/>(page/block geometry)"]
-        EMMC_LAYER["eMMC Layer<br/>(partition table)"]
-        SPI_LAYER["SPI Flash Layer<br/>(region map)"]
-        UEFI_LAYER["UEFI Volume Layer<br/>(FFS + GUID)"]
-        GPU_LAYER["GPU Layer<br/>(local/shared/const)"]
+        DMA_LAYER["DMA Live Layer<br/>(real-time read)"]:::analysis
+        CB_LAYER["Cold Boot Layer<br/>(decay confidence)"]:::analysis
+        NAND_LAYER["NAND Layer<br/>(page/block geometry)"]:::analysis
+        EMMC_LAYER["eMMC Layer<br/>(partition table)"]:::analysis
+        SPI_LAYER["SPI Flash Layer<br/>(region map)"]:::analysis
+        UEFI_LAYER["UEFI Volume Layer<br/>(FFS + GUID)"]:::analysis
+        GPU_LAYER["GPU Layer<br/>(local/shared/const)"]:::analysis
     end
 
-    ANALYSIS["Analysis Pipeline<br/>(Volatility 3, MemProcFS,<br/>Page Table Walker,<br/>Detection Modules)"]
+    ANALYSIS["Analysis Pipeline<br/>(Volatility 3, MemProcFS,<br/>Page Table Walker,<br/>Detection Modules)"]:::detect
 
     PCIE --> PCIL --> DMA_LAYER
     FW1394 --> PCIL
@@ -339,6 +396,11 @@ flowchart TD
     SPI_LAYER --> ANALYSIS
     UEFI_LAYER --> ANALYSIS
     GPU_LAYER --> ANALYSIS
+
+    classDef hardware fill:#ff8787,stroke:#e03131,color:#1a1a2e
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
 ```
 
 ### Advanced Memory Analysis
@@ -354,33 +416,75 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph PhysMem["Physical Memory Image"]
-        RAW["Raw / LiME /<br/>ELF Core Dump"]
+        RAW["Raw / LiME /<br/>ELF Core Dump"]:::source
     end
 
     subgraph Translation["Page Table Reconstruction"]
-        CR3["CR3 Discovery<br/>(brute-force scan or<br/>EPROCESS extraction)"]
-        PML4["PML4 Walk<br/>(512 entries)"]
-        PDPT["PDPT Walk"]
-        PD["PD Walk<br/>(2M large page check)"]
-        PT["PT Walk<br/>(4K page)"]
-        VIRT["Virtual Address<br/>Layer"]
+        CR3["CR3 Discovery<br/>(brute-force scan or<br/>EPROCESS extraction)"]:::analysis
+        PML4["PML4 Walk<br/>(512 entries)"]:::analysis
+        PDPT["PDPT Walk"]:::analysis
+        PD["PD Walk"]:::analysis
+        PT["PT Walk<br/>(4K page)"]:::analysis
+        VIRT["Virtual Address<br/>Layer"]:::analysis
     end
 
     subgraph Analysis["Per-Process Analysis"]
-        HEAP["Heap Forensics<br/>(freed data recovery)"]
-        NET["TCP/IP Stack<br/>Reconstruction"]
-        STR["String Carving<br/>(multi-encoding)"]
-        CMD["Command History<br/>(cmd, PS, bash)"]
-        ENV["Environment<br/>Variables"]
+        HEAP["Heap Forensics<br/>(freed data recovery)"]:::detect
+        NET["TCP/IP Stack<br/>Reconstruction"]:::detect
+        STR["String Carving<br/>(multi-encoding)"]:::detect
+        CMD["Command History<br/>(cmd, PS, bash)"]:::detect
+        ENV["Environment<br/>Variables"]:::detect
     end
 
     RAW --> CR3 --> PML4 --> PDPT --> PD --> PT --> VIRT
+    PDPT -.->|"1G huge page<br/>(PS bit set)"| VIRT
+    PD -.->|"2M large page<br/>(PS bit set)"| VIRT
 
     VIRT --> HEAP
     VIRT --> NET
     VIRT --> STR
     VIRT --> CMD
     VIRT --> ENV
+
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
+```
+
+#### x86-64 Virtual Address Translation
+
+Each virtual address is decomposed into index fields that walk the 4-level page table hierarchy. The PS (Page Size) bit at the PD or PDPT level short-circuits the walk for 2M or 1G large pages.
+
+```text
+ x86-64 Virtual Address (48-bit canonical form)
+ ================================================================
+
+  63        48 47    39 38    30 29    21 20    12 11         0
+ +-----------+--------+--------+--------+--------+------------+
+ | Sign Ext  | PML4   | PDPT   |   PD   |   PT   |   Offset   |
+ | (copy of  | Index  | Index  | Index  | Index  |  (12 bits)  |
+ |  bit 47)  | 9 bits | 9 bits | 9 bits | 9 bits |            |
+ +-----------+---+----+---+----+---+----+---+----+------------+
+                 |        |        |        |
+    CR3 ------->+        |        |        |
+                 v        |        |        |
+              PML4 Table  |        |        |     Page Sizes:
+              (512 entries)|       |        |     ============
+                 |        v        |        |
+                 +-->  PDPT Table  |        |     1G huge page
+                    (512 entries)  |        |       = PDPT entry
+                          |       v        |         with PS=1
+                          +--> PD Table    |
+                             (512 entries) |      2M large page
+                                  |       v        = PD entry
+                                  +--> PT Table      with PS=1
+                                     (512 entries)
+                                          |       4K standard
+                                          v        = PT entry
+                                     Physical        (normal)
+                                      Address
+
+ With LA57 (5-level paging):  adds PML5 index at bits [56:48]
 ```
 
 ### Firmware & Rootkit Detection
@@ -410,22 +514,34 @@ sequenceDiagram
     participant Vol3 as Volatility 3
     participant YARA
 
-    Analyst->>DeepView: deepview memory acquire --method winpmem -o server.raw
-    DeepView->>Target: WinPmem driver loads, captures physical memory
-    Target-->>DeepView: Raw dump (server.raw) + SHA-256 hash
+    rect rgba(255,169,77,0.08)
+        Note over Analyst,Target: Acquisition Phase
+        Analyst->>DeepView: deepview memory acquire --method winpmem -o server.raw
+        DeepView->>Target: WinPmem driver loads, captures physical memory
+        Target-->>DeepView: Raw dump (server.raw) + SHA-256 hash
+    end
 
-    Analyst->>DeepView: deepview memory analyze --image server.raw --plugin pslist
-    DeepView->>Vol3: Run windows.pslist.PsList
-    Vol3-->>DeepView: Process table (PID, PPID, name, create time)
-    DeepView-->>Analyst: Rich table output with process tree
+    rect rgba(116,192,252,0.08)
+        Note over Analyst,Vol3: Analysis Phase
+        Analyst->>DeepView: deepview memory analyze --image server.raw --plugin pslist
+        DeepView->>Vol3: Run windows.pslist.PsList
+        Vol3-->>DeepView: Process table (PID, PPID, name, create time)
+        DeepView-->>Analyst: Rich table output with process tree
+    end
 
-    Analyst->>DeepView: deepview memory scan --image server.raw --rules malware.yar
-    DeepView->>YARA: Scan all memory regions
-    YARA-->>DeepView: Matches: SuspiciousStrings at PID 4832 (powershell.exe)
-    DeepView-->>Analyst: Scan results with offsets, rule names, matched data
+    rect rgba(192,132,252,0.08)
+        Note over Analyst,YARA: Detection Phase
+        Analyst->>DeepView: deepview memory scan --image server.raw --rules malware.yar
+        DeepView->>YARA: Scan all memory regions
+        YARA-->>DeepView: Matches: SuspiciousStrings at PID 4832 (powershell.exe)
+        DeepView-->>Analyst: Scan results with offsets, rule names, matched data
+    end
 
-    Analyst->>DeepView: deepview report export --format stix -o findings.json
-    DeepView-->>Analyst: STIX 2.1 bundle with ATT&CK technique references
+    rect rgba(105,219,124,0.08)
+        Note over Analyst,DeepView: Export Phase
+        Analyst->>DeepView: deepview report export --format stix -o findings.json
+        DeepView-->>Analyst: STIX 2.1 bundle with ATT&CK technique references
+    end
 ```
 
 **Applicable techniques:** T1059.001 (PowerShell), T1003 (Credential Dumping), T1055 (Process Injection)
@@ -436,25 +552,32 @@ A threat hunter suspects a Linux server has been compromised by a kernel rootkit
 
 ```mermaid
 flowchart TD
-    A["Acquire memory<br/>deepview memory acquire --method avml"] --> B["Parse memory dump<br/>(LiME format auto-detected)"]
-    B --> C["Enumerate processes from<br/>multiple kernel structures"]
+    A["Acquire memory<br/>deepview memory acquire --method avml"]:::source --> B["Parse memory dump<br/>(LiME format auto-detected)"]:::source
+    B --> C["Enumerate processes from<br/>multiple kernel structures"]:::analysis
 
-    C --> D["PsActiveProcessHead<br/>(linked list walk)"]
-    C --> E["PspCidTable<br/>(handle table)"]
-    C --> F["Session process list"]
-    C --> G["Thread scanning"]
+    C --> D["PsActiveProcessHead<br/>(linked list walk)"]:::analysis
+    C --> E["PspCidTable<br/>(handle table)"]:::analysis
+    C --> F["Session process list"]:::analysis
+    C --> G["Thread scanning"]:::analysis
 
-    D --> H{"Cross-reference<br/>PID sets"}
+    D --> H{"Cross-reference<br/>PID sets"}:::decision
     E --> H
     F --> H
     G --> H
 
-    H -->|PIDs match| I["Clean processes"]
-    H -->|PID mismatch| J["ALERT: Hidden process detected<br/>DKOM manipulation (T1014)"]
+    H -->|PIDs match| I["Clean processes"]:::clean
+    H -->|PID mismatch| J["ALERT: Hidden process detected<br/>DKOM manipulation (T1014)"]:::threat
 
-    J --> K["Generate ATT&CK Navigator layer"]
-    J --> L["Export STIX 2.1 indicators"]
-    J --> M["HTML forensic report"]
+    J --> K["Generate ATT&CK Navigator layer"]:::report
+    J --> L["Export STIX 2.1 indicators"]:::report
+    J --> M["HTML forensic report"]:::report
+
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef decision fill:#ffd43b,stroke:#f08c00,color:#1a1a2e
+    classDef clean fill:#51cf66,stroke:#2f9e44,color:#1a1a2e
+    classDef threat fill:#ff6b6b,stroke:#e03131,color:#fff
+    classDef report fill:#69db7c,stroke:#2f9e44,color:#1a1a2e
 ```
 
 **Applicable techniques:** T1014 (Rootkit), T1574 (Hijack Execution Flow), T1562.001 (Disable Security Tools)
@@ -470,23 +593,32 @@ sequenceDiagram
     participant Kernel as Linux Kernel
     participant BPF as eBPF Subsystem
 
-    Analyst->>DeepView: deepview trace syscall --duration 60 --syscall execve connect openat
-    DeepView->>BPF: Compile and load BPF C program
-    BPF->>Kernel: Attach tracepoints (sys_enter_execve, sys_enter_connect, sys_enter_openat)
-    Kernel-->>BPF: Events via ring buffer
+    rect rgba(59,201,219,0.08)
+        Note over DeepView,BPF: Program Compilation & Loading
+        Analyst->>DeepView: deepview trace syscall --duration 60 --syscall execve connect openat
+        DeepView->>BPF: Compile and load BPF C program
+        BPF->>Kernel: Attach tracepoints (sys_enter_execve, sys_enter_connect, sys_enter_openat)
+        Kernel-->>BPF: Events via ring buffer
+    end
 
-    loop Every event
-        BPF-->>DeepView: MonitorEvent (pid, comm, syscall, args, timestamp)
-        DeepView->>DeepView: Apply user-space filter residuals
-        DeepView-->>Analyst: Formatted event stream (Rich table)
+    rect rgba(192,132,252,0.08)
+        Note over Analyst,BPF: Real-Time Event Collection
+        loop Every event
+            BPF-->>DeepView: MonitorEvent (pid, comm, syscall, args, timestamp)
+            DeepView->>DeepView: Apply user-space filter residuals
+            DeepView-->>Analyst: Formatted event stream (Rich table)
+        end
     end
 
     Note over Analyst,BPF: Analyst observes /bin/sh spawned by httpd,<br/>followed by connect() to external IP
 
-    Analyst->>DeepView: deepview trace network --pid 8472 --duration 30
-    DeepView->>BPF: Attach kprobe:tcp_v4_connect filtered by PID 8472
-    BPF-->>DeepView: TCP connection events (saddr, daddr, dport)
-    DeepView-->>Analyst: Network activity for suspect process
+    rect rgba(116,192,252,0.08)
+        Note over Analyst,BPF: Focused PID Tracing
+        Analyst->>DeepView: deepview trace network --pid 8472 --duration 30
+        DeepView->>BPF: Attach kprobe:tcp_v4_connect filtered by PID 8472
+        BPF-->>DeepView: TCP connection events (saddr, daddr, dport)
+        DeepView-->>Analyst: Network activity for suspect process
+    end
 ```
 
 **Applicable techniques:** T1059.004 (Unix Shell), T1071.001 (Web Protocols), T1041 (Exfiltration Over C2)
@@ -502,23 +634,32 @@ sequenceDiagram
     participant KVM as QEMU/KVM (libvirt)
     participant Vol3 as Volatility 3
 
-    Investigator->>DeepView: deepview vm list --hypervisor qemu
-    DeepView->>KVM: libvirt.listDomainsID() + listDefinedDomains()
-    KVM-->>DeepView: VM list (name, UUID, state, memory)
-    DeepView-->>Investigator: Table of VMs
+    rect rgba(255,169,77,0.08)
+        Note over Investigator,KVM: VM Enumeration
+        Investigator->>DeepView: deepview vm list --hypervisor qemu
+        DeepView->>KVM: libvirt.listDomainsID() + listDefinedDomains()
+        KVM-->>DeepView: VM list (name, UUID, state, memory)
+        DeepView-->>Investigator: Table of VMs
+    end
 
-    Investigator->>DeepView: deepview vm snapshot --vm-id web-server --name forensic-snap
-    DeepView->>KVM: domain.snapshotCreateXML (memory-inclusive)
-    KVM-->>DeepView: Snapshot created
+    rect rgba(255,169,77,0.12)
+        Note over Investigator,KVM: Snapshot & Extraction
+        Investigator->>DeepView: deepview vm snapshot --vm-id web-server --name forensic-snap
+        DeepView->>KVM: domain.snapshotCreateXML (memory-inclusive)
+        KVM-->>DeepView: Snapshot created
 
-    Investigator->>DeepView: deepview vm extract --vm-id web-server -o vm-memory.raw
-    DeepView->>KVM: virsh dump --memory-only
-    KVM-->>DeepView: Memory dump (vm-memory.raw)
+        Investigator->>DeepView: deepview vm extract --vm-id web-server -o vm-memory.raw
+        DeepView->>KVM: virsh dump --memory-only
+        KVM-->>DeepView: Memory dump (vm-memory.raw)
+    end
 
-    Investigator->>DeepView: deepview memory analyze --image vm-memory.raw --plugin pslist
-    DeepView->>Vol3: Process enumeration
-    Vol3-->>DeepView: Process list
-    DeepView-->>Investigator: Results + timeline
+    rect rgba(116,192,252,0.08)
+        Note over Investigator,Vol3: Offline Analysis
+        Investigator->>DeepView: deepview memory analyze --image vm-memory.raw --plugin pslist
+        DeepView->>Vol3: Process enumeration
+        Vol3-->>DeepView: Process list
+        DeepView-->>Investigator: Results + timeline
+    end
 
     Note over Investigator: VM continues running undisturbed
 ```
@@ -531,29 +672,36 @@ A malware analyst receives a suspicious ELF binary. Deep View analyzes its struc
 
 ```mermaid
 flowchart TD
-    A["Suspect binary<br/>deepview instrument analyze --binary suspect.elf"] --> B["LIEF parses ELF headers<br/>sections, imports, exports, symbols"]
-    B --> C["InstrumentationPointFinder<br/>identifies hookable functions"]
+    A["Suspect binary<br/>deepview instrument analyze --binary suspect.elf"]:::source --> B["LIEF parses ELF headers<br/>sections, imports, exports, symbols"]:::analysis
+    B --> C["InstrumentationPointFinder<br/>identifies hookable functions"]:::analysis
 
-    C --> D["Exported functions"]
-    C --> E["Security-sensitive APIs<br/>(connect, execve, mmap, dlopen...)"]
-    C --> F["Symbol table functions"]
+    C --> D["Exported functions"]:::source
+    C --> E["Security-sensitive APIs<br/>(connect, execve, mmap, dlopen...)"]:::source
+    C --> F["Symbol table functions"]:::source
 
-    D & E & F --> G["Generate hook plan"]
+    D & E & F --> G["Generate hook plan"]:::analysis
 
-    G --> H{"Choose approach"}
+    G --> H{"Choose approach"}:::decision
 
-    H -->|Dynamic| I["deepview instrument spawn --program suspect.elf --hooks hooks.json"]
-    I --> J["Frida attaches before main()"]
-    J --> K["Interceptor.attach() on each target"]
-    K --> L["Real-time API trace via EventBus"]
+    H -->|Dynamic| I["deepview instrument spawn --program suspect.elf --hooks hooks.json"]:::instrument
+    I --> J["Frida attaches before main()"]:::instrument
+    J --> K["Interceptor.attach() on each target"]:::instrument
+    K --> L["Real-time API trace via EventBus"]:::report
 
-    H -->|Static| M["deepview instrument patch --binary suspect.elf -o monitored.elf --strategy security"]
-    M --> N["Compute stolen bytes (Capstone)"]
-    N --> O["Generate trampolines (x86_64/aarch64)"]
-    O --> P["Add .dvmon section via LIEF"]
-    P --> Q["Patch function prologues with JMP"]
-    Q --> R["Write instrumented binary"]
-    R --> S["Execute monitored.elf in sandbox"]
+    H -->|Static| M["deepview instrument patch --binary suspect.elf -o monitored.elf --strategy security"]:::detect
+    M --> N["Compute stolen bytes (Capstone)"]:::detect
+    N --> O["Generate trampolines (x86_64/aarch64)"]:::detect
+    O --> P["Add .dvmon section via LIEF"]:::detect
+    P --> Q["Patch function prologues with JMP"]:::detect
+    Q --> R["Write instrumented binary"]:::detect
+    R --> S["Execute monitored.elf in sandbox"]:::report
+
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef decision fill:#ffd43b,stroke:#f08c00,color:#1a1a2e
+    classDef instrument fill:#3bc9db,stroke:#1098ad,color:#1a1a2e
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
+    classDef report fill:#69db7c,stroke:#2f9e44,color:#1a1a2e
 ```
 
 **Applicable techniques:** T1027 (Obfuscated Files), T1059 (Command Execution), T1055 (Process Injection)
@@ -565,25 +713,25 @@ After completing a forensic investigation, the analyst exports all findings to o
 ```mermaid
 flowchart LR
     subgraph DeepView["Deep View Analysis"]
-        D1["DKOM Detection<br/>(T1014)"]
-        D2["Process Hollowing<br/>(T1055.012)"]
-        D3["SSDT Hooks<br/>(T1574.013)"]
-        D4["Injected Code<br/>(T1055)"]
-        D5["PEB Masquerade<br/>(T1036.005)"]
+        D1["DKOM Detection<br/>(T1014)"]:::threat
+        D2["Process Hollowing<br/>(T1055.012)"]:::threat
+        D3["SSDT Hooks<br/>(T1574.013)"]:::threat
+        D4["Injected Code<br/>(T1055)"]:::threat
+        D5["PEB Masquerade<br/>(T1036.005)"]:::threat
     end
 
     subgraph Export["Export Pipeline"]
-        STIX["STIX 2.1 Bundle<br/>(indicators, observed-data)"]
-        NAV["ATT&CK Navigator<br/>Layer JSON"]
-        RPT["HTML Forensic Report"]
-        TL["Event Timeline"]
+        STIX["STIX 2.1 Bundle<br/>(indicators, observed-data)"]:::report
+        NAV["ATT&CK Navigator<br/>Layer JSON"]:::report
+        RPT["HTML Forensic Report"]:::report
+        TL["Event Timeline"]:::report
     end
 
     subgraph Consume["Downstream Systems"]
-        TIP["Threat Intel Platform<br/>(MISP, OpenCTI)"]
-        SIEM["SIEM<br/>(Splunk, Elastic)"]
-        SOC["SOC Dashboard"]
-        CASE["Case Management"]
+        TIP["Threat Intel Platform<br/>(MISP, OpenCTI)"]:::analysis
+        SIEM["SIEM<br/>(Splunk, Elastic)"]:::analysis
+        SOC["SOC Dashboard"]:::analysis
+        CASE["Case Management"]:::analysis
     end
 
     D1 & D2 & D3 & D4 & D5 --> STIX
@@ -596,6 +744,10 @@ flowchart LR
     NAV --> SOC
     RPT --> CASE
     TL --> SIEM
+
+    classDef threat fill:#ff6b6b,stroke:#e03131,color:#fff
+    classDef report fill:#69db7c,stroke:#2f9e44,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
 ```
 
 ---
@@ -781,6 +933,42 @@ Deep View uses a three-tier plugin discovery mechanism:
 2. **Entry point plugins** --- third-party packages register via `[project.entry-points."deepview.plugins"]` in their `pyproject.toml`
 3. **Directory plugins** --- Python files dropped into `~/.deepview/plugins/` or paths specified via `--plugin-path`
 
+```mermaid
+flowchart TD
+    subgraph Discovery["Three-Tier Plugin Discovery"]
+        T1["Tier 1: Built-in<br/>import deepview.plugins.builtin"]:::analysis
+        T2["Tier 2: Entry Points<br/>importlib.metadata.entry_points<br/>('deepview.plugins')"]:::analysis
+        T3["Tier 3: Directory Scan<br/>~/.deepview/plugins/*.py<br/>or --plugin-path"]:::analysis
+    end
+
+    DEC["@register_plugin<br/>decorator fires"]:::instrument
+    EP["Load module via<br/>entry point"]:::instrument
+    DYN["Dynamic spec loader<br/>(importlib)"]:::instrument
+
+    REG["PluginRegistry<br/>(unified catalog)"]:::core
+
+    subgraph Execution["Plugin Lifecycle"]
+        INST["registry.instantiate<br/>(name, config)"]:::core
+        REQ["plugin.get_requirements()"]:::source
+        RUN["plugin.run()"]:::detect
+        RES["PluginResult<br/>(columns + rows)"]:::report
+    end
+
+    REND["ResultRenderer<br/>(table / JSON / CSV)"]:::report
+
+    T1 --> DEC --> REG
+    T2 --> EP --> REG
+    T3 --> DYN --> REG
+    REG --> INST --> REQ --> RUN --> RES --> REND
+
+    classDef core fill:#868e96,stroke:#495057,color:#fff
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef instrument fill:#3bc9db,stroke:#1098ad,color:#1a1a2e
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
+    classDef report fill:#69db7c,stroke:#2f9e44,color:#1a1a2e
+```
+
 ### Writing a Plugin
 
 ```python
@@ -834,58 +1022,97 @@ class MyAnalysisPlugin(DeepViewPlugin):
 Deep View maps all detections to MITRE ATT&CK techniques and generates Navigator layers for visualization.
 
 ```mermaid
-mindmap
-  root((Deep View<br/>Detections))
-    Defense Evasion
-      T1014 Rootkit
-        DKOM hidden processes
-        Driver hiding
-        Driver signature mismatch
-      T1055 Process Injection
-        T1055.001 DLL Injection
-        T1055.002 PE Injection
-        T1055.003 Thread Hijacking
-        T1055.004 APC Injection
-        T1055.012 Process Hollowing
-        T1055.013 Process Doppelganging
-        T1055.014 VDSO Hijacking
-      T1574 Hijack Execution Flow
-        T1574.013 KernelCallbackTable
-        SSDT hooks
-        Inline hooks
-      T1036.005 Match Legitimate Name
-        PEB masquerading
-      T1562.001 Disable Security Tools
-        PatchGuard bypass detection
-      T1564.006 Run Virtual Instance
-        Hypervisor rootkit detection
-        VMCS scanning
-        CPUID timing analysis
-    Persistence
-      T1542 Pre-OS Boot
-        T1542.001 System Firmware
-          UEFI rootkit detection
-          SPI flash integrity
-        T1542.003 Bootkit
-          MBR/VBR integrity
-          Boot code tampering
-    Credential Access
-      Encryption key recovery
-        AES-128/256 key schedules
-        RSA private key structures
-        BitLocker FVEK
-        dm-crypt master keys
-        TLS session keys
-    Discovery
-      Process enumeration
-      Network connections
-      Loaded modules
-      Page table mapping
-    Collection
-      Volatile artifacts
-        Command history
-        Clipboard contents
-        Environment variables
+graph LR
+    ROOT(("Deep View<br/>Detections")):::core
+
+    subgraph DE["Defense Evasion"]
+        T1014["T1014 Rootkit"]:::threat
+        T1014a["DKOM hidden processes"]:::threat
+        T1014b["Driver hiding"]:::threat
+        T1014c["Driver signature mismatch"]:::threat
+        T1055["T1055 Process Injection"]:::threat
+        T1055_1["T1055.001 DLL Injection"]:::threat
+        T1055_2["T1055.002 PE Injection"]:::threat
+        T1055_3["T1055.003 Thread Hijacking"]:::threat
+        T1055_4["T1055.004 APC Injection"]:::threat
+        T1055_12["T1055.012 Process Hollowing"]:::threat
+        T1055_13["T1055.013 Process Doppelganging"]:::threat
+        T1055_14["T1055.014 VDSO Hijacking"]:::threat
+        T1574["T1574 Hijack Execution Flow"]:::threat
+        T1574_13["T1574.013 KernelCallbackTable"]:::threat
+        T1574a["SSDT hooks"]:::threat
+        T1574b["Inline hooks"]:::threat
+        T1036["T1036.005 Match Legitimate Name"]:::threat
+        T1036a["PEB masquerading"]:::threat
+        T1562["T1562.001 Disable Security Tools"]:::threat
+        T1562a["PatchGuard bypass detection"]:::threat
+        T1564["T1564.006 Run Virtual Instance"]:::threat
+        T1564a["Hypervisor rootkit detection"]:::threat
+        T1564b["VMCS scanning"]:::threat
+        T1564c["CPUID timing analysis"]:::threat
+    end
+
+    subgraph PE["Persistence"]
+        T1542["T1542 Pre-OS Boot"]:::source
+        T1542_1["T1542.001 System Firmware"]:::source
+        T1542_1a["UEFI rootkit detection"]:::source
+        T1542_1b["SPI flash integrity"]:::source
+        T1542_3["T1542.003 Bootkit"]:::source
+        T1542_3a["MBR/VBR integrity"]:::source
+        T1542_3b["Boot code tampering"]:::source
+    end
+
+    subgraph CA["Credential Access"]
+        KEYS["Encryption key recovery"]:::detect
+        AES["AES-128/256 key schedules"]:::detect
+        RSA["RSA private key structures"]:::detect
+        BL["BitLocker FVEK"]:::detect
+        DM["dm-crypt master keys"]:::detect
+        TLS["TLS session keys"]:::detect
+    end
+
+    subgraph DI["Discovery"]
+        PROC["Process enumeration"]:::analysis
+        NETC["Network connections"]:::analysis
+        MODS["Loaded modules"]:::analysis
+        PTMAP["Page table mapping"]:::analysis
+    end
+
+    subgraph CO["Collection"]
+        VOL["Volatile artifacts"]:::instrument
+        CMDHIST["Command history"]:::instrument
+        CLIP["Clipboard contents"]:::instrument
+        ENVV["Environment variables"]:::instrument
+    end
+
+    ROOT --> DE
+    ROOT --> PE
+    ROOT --> CA
+    ROOT --> DI
+    ROOT --> CO
+
+    T1014 --> T1014a & T1014b & T1014c
+    T1055 --> T1055_1 & T1055_2 & T1055_3 & T1055_4
+    T1055 --> T1055_12 & T1055_13 & T1055_14
+    T1574 --> T1574_13 & T1574a & T1574b
+    T1036 --> T1036a
+    T1562 --> T1562a
+    T1564 --> T1564a & T1564b & T1564c
+
+    T1542 --> T1542_1 & T1542_3
+    T1542_1 --> T1542_1a & T1542_1b
+    T1542_3 --> T1542_3a & T1542_3b
+
+    KEYS --> AES & RSA & BL & DM & TLS
+
+    VOL --> CMDHIST & CLIP & ENVV
+
+    classDef core fill:#868e96,stroke:#495057,color:#fff
+    classDef threat fill:#ff6b6b,stroke:#e03131,color:#fff
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef instrument fill:#3bc9db,stroke:#1098ad,color:#1a1a2e
 ```
 
 ### DKOM Detection
@@ -899,6 +1126,82 @@ Direct Kernel Object Manipulation is detected by enumerating processes from inde
 - Session process lists
 - Desktop thread scanning (walk all threads, collect owning processes)
 
+```text
+ DKOM: How Hidden Processes Are Detected via Cross-Referencing
+ =============================================================
+
+ NORMAL STATE (all structures agree):
+
+   PsActiveProcessHead:  [System] <-> [smss] <-> [csrss] <-> [malware] <-> [svchost] <-> ...
+   PspCidTable:           PID 4 OK    PID 312 OK  PID 488 OK  PID 1337 OK  PID 672 OK
+   CSRSS handles:         PID 4 OK    PID 312 OK  PID 488 OK  PID 1337 OK  PID 672 OK
+   Thread scanning:       PID 4 OK    PID 312 OK  PID 488 OK  PID 1337 OK  PID 672 OK
+
+
+ AFTER DKOM (attacker unlinks PID 1337 from PsActiveProcessHead):
+
+   PsActiveProcessHead:  [System] <-> [smss] <-> [csrss] <-=========-> [svchost] <-> ...
+                                                                ^
+                                                      PID 1337 MISSING!
+
+   PspCidTable:           PID 4 OK    PID 312 OK  PID 488 OK  PID 1337 OK  PID 672 OK
+   CSRSS handles:         PID 4 OK    PID 312 OK  PID 488 OK  PID 1337 OK  PID 672 OK
+   Thread scanning:       PID 4 OK    PID 312 OK  PID 488 OK  PID 1337 OK  PID 672 OK
+                                                                ^^^^^^^^
+                                                           STILL PRESENT!
+
+   Result: PID 1337 found in PspCidTable + CSRSS + threads but NOT in
+           PsActiveProcessHead --> DKOM DETECTED (MITRE ATT&CK T1014)
+```
+
+### Hook Detection & Trampoline Architecture
+
+Deep View detects inline function hooks by scanning function prologues for unexpected JMP/CALL instructions. The following shows how a rootkit hooks a function and how Deep View's static binary patching uses the same trampoline technique for monitoring:
+
+```text
+ BEFORE HOOK (original function):                AFTER HOOK (rootkit-patched):
+ ===================================             ===================================
+ NtQuerySystemInformation:                       NtQuerySystemInformation:
+   0x00: 4C 8B D1    mov r10, rcx                 0x00: E9 xx xx xx xx   jmp <detour>
+   0x03: B8 36 00    mov eax, 0x36                 0x05: 00 00 00        <nop padding>
+   0x06: 0F 05       syscall                       ...
+   0x08: C3          ret
+                                                  Detour Code (rootkit):
+                                                    - Filter/modify results
+                                                    - Call trampoline to run original
+
+                                                  Trampoline (stolen bytes):
+                                                    0x00: 4C 8B D1    mov r10, rcx  --|
+                                                    0x03: B8 36 00    mov eax, 0x36    | stolen
+                                                    0x06: E9 xx xx    jmp back (0x06) -|
+
+ DETECTION: Scan prologue bytes for E9/FF/EB opcodes (JMP variants).
+            If target address falls outside the owning module's range
+            → flag as inline hook (T1574).
+```
+
+```mermaid
+flowchart LR
+    SCAN["Scan Function<br/>Prologues"]:::analysis
+    CHECK{"First bytes =<br/>JMP/CALL opcode?<br/>(E9, FF 25, EB)"}:::decision
+    SAFE["Clean Function"]:::clean
+    TARGET["Resolve JMP<br/>Target Address"]:::analysis
+    MOD{"Target within<br/>owning module<br/>range?"}:::decision
+    HOOK["Inline Hook<br/>Detected (T1574)"]:::threat
+    LEGIT["Legitimate<br/>Redirection"]:::clean
+
+    SCAN --> CHECK
+    CHECK -->|No| SAFE
+    CHECK -->|Yes| TARGET --> MOD
+    MOD -->|No| HOOK
+    MOD -->|Yes| LEGIT
+
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef decision fill:#ffd43b,stroke:#f08c00,color:#1a1a2e
+    classDef clean fill:#51cf66,stroke:#2f9e44,color:#1a1a2e
+    classDef threat fill:#ff6b6b,stroke:#e03131,color:#fff
+```
+
 ### Process Injection Detection
 
 | Sub-technique | Detection Method |
@@ -908,6 +1211,46 @@ Direct Kernel Object Manipulation is detected by enumerating processes from inde
 | Thread Hijacking (T1055.003) | Thread start address outside any known module's address range |
 | PEB Masquerading (T1036.005) | PEB image path or command line inconsistent with on-disk binary |
 
+```mermaid
+flowchart TD
+    PROC["Target Process<br/>Memory Space"]:::analysis
+
+    subgraph VAD["Virtual Address Descriptor Tree"]
+        V1[".text (image)<br/>R-X, file-backed"]:::clean
+        V2[".data (image)<br/>RW-, file-backed"]:::clean
+        V3["ntdll.dll<br/>R-X, file-backed"]:::clean
+        V4["Stack<br/>RW-, private"]:::clean
+        V5["Heap<br/>RW-, private"]:::clean
+        V6["RWX Region<br/>private, no file backing"]:::threat
+        V7["Mapped DLL<br/>R-X, file-backed"]:::clean
+    end
+
+    PROC --> VAD
+
+    subgraph Checks["Detection Checks"]
+        CK1{"PEB.ImageBaseAddress<br/>== actual image base?"}:::decision
+        CK2{"Any VAD with<br/>PAGE_EXECUTE_READWRITE<br/>+ private + no file?"}:::decision
+        CK3{"Thread start addr<br/>inside known module<br/>range?"}:::decision
+        CK4{"PEB image path<br/>== on-disk binary?"}:::decision
+    end
+
+    CK1 -->|No| H1["Process Hollowing<br/>(T1055.012)"]:::threat
+    CK1 -->|Yes| OK1["Normal"]:::clean
+    CK2 -->|Yes| H2["Injected Code<br/>(T1055)"]:::threat
+    CK2 -->|No| OK2["Normal"]:::clean
+    CK3 -->|No| H3["Thread Hijacking<br/>(T1055.003)"]:::threat
+    CK3 -->|Yes| OK3["Normal"]:::clean
+    CK4 -->|No| H4["PEB Masquerade<br/>(T1036.005)"]:::threat
+    CK4 -->|Yes| OK4["Normal"]:::clean
+
+    V6 -.-> CK2
+
+    classDef clean fill:#51cf66,stroke:#2f9e44,color:#1a1a2e
+    classDef threat fill:#ff6b6b,stroke:#e03131,color:#fff
+    classDef decision fill:#ffd43b,stroke:#f08c00,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+```
+
 ### Encryption Key Recovery
 
 | Key Type | Detection Method |
@@ -916,6 +1259,41 @@ Direct Kernel Object Manipulation is detected by enumerating processes from inde
 | RSA Private Keys | ASN.1 DER sequence detection: `SEQUENCE { INTEGER(0), INTEGER(modulus), ... }` |
 | BitLocker FVEK | `-FVE-FS-` signature scanning in memory |
 | dm-crypt | Master key extraction from kernel `crypt_config` structures |
+
+```mermaid
+flowchart TD
+    MEM["Physical Memory<br/>(DataLayer)"]:::source
+
+    SCAN["Sliding Window Scanner<br/>(sequential byte scan)"]:::analysis
+
+    ENT{"Entropy Check<br/>> 6.0 bits/byte?"}:::decision
+
+    ENT -->|No| SKIP["Skip region<br/>(low entropy = unlikely key)"]:::core
+    ENT -->|Yes| CAND["Candidate Key<br/>Material"]:::analysis
+
+    MEM --> SCAN --> ENT
+
+    subgraph Validators["Key Type Validators"]
+        AES_V["AES Validator<br/>Verify round key<br/>derivation relationships<br/>(Rcon + SubBytes + XOR)"]:::detect
+        RSA_V["RSA Validator<br/>Check ASN.1 DER header<br/>(0x30 0x82 ... SEQUENCE)"]:::detect
+        BL_V["BitLocker Validator<br/>Scan for -FVE-FS-<br/>metadata signature"]:::detect
+        DM_V["dm-crypt Validator<br/>Locate crypt_config<br/>kernel structures"]:::detect
+    end
+
+    CAND --> AES_V & RSA_V & BL_V & DM_V
+
+    AES_V -->|valid| AES_K["AES-128/256 Key<br/>+ confidence score"]:::report
+    RSA_V -->|valid| RSA_K["RSA Private Key<br/>+ key length"]:::report
+    BL_V -->|valid| BL_K["BitLocker FVEK"]:::report
+    DM_V -->|valid| DM_K["dm-crypt Master Key"]:::report
+
+    classDef source fill:#ffa94d,stroke:#f76707,color:#1a1a2e
+    classDef analysis fill:#74c0fc,stroke:#339af0,color:#1a1a2e
+    classDef decision fill:#ffd43b,stroke:#f08c00,color:#1a1a2e
+    classDef core fill:#868e96,stroke:#495057,color:#fff
+    classDef detect fill:#c084fc,stroke:#7950f2,color:#fff
+    classDef report fill:#69db7c,stroke:#2f9e44,color:#1a1a2e
+```
 
 ### Anomaly Scoring
 
