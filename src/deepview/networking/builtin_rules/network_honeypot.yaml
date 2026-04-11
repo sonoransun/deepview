@@ -1,0 +1,33 @@
+# Starter mangle ruleset: observation-only, no active rewriting.
+#
+# Used by 'deepview netmangle validate' as a known-good file and by
+# the CLI help as a reference shape. Authors should copy this file
+# and opt into drop/delay/rewrite/corrupt actions explicitly — every
+# one of those actions modifies host traffic and must be a conscious
+# choice.
+
+queue: 42
+default_verdict: accept
+fail_open: true
+
+rules:
+  - id: observe_dns_out
+    description: Log every outbound DNS query (UDP/53)
+    match: 'packet.udp.dport == 53'
+    action:
+      type: observe
+      label: dns_out
+
+  - id: observe_https_out
+    description: Log outbound TLS handshakes
+    match: 'packet.tcp.dport == 443 and packet.tcp.syn == true'
+    action:
+      type: observe
+      label: tls_out
+
+  - id: mark_ssh
+    description: Tag outbound SSH with fwmark 0x1000 (route shaping hook)
+    match: 'packet.tcp.dport == 22'
+    action:
+      type: mark
+      fwmark: 0x1000

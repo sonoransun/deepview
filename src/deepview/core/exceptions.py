@@ -167,24 +167,6 @@ class BaselineError(DeepViewError):
     """Baseline profiling or comparison failure."""
 
 
-class SnapshotStoreError(BaselineError):
-    """Baseline snapshot storage failure."""
-
-
-# -- Correlation -------------------------------------------------------------
-
-class CorrelationError(DeepViewError):
-    """Base exception for the cross-subsystem correlation engine."""
-
-
-class EntityNotFoundError(CorrelationError):
-    """Looked-up entity does not exist in the correlation graph."""
-
-
-class RuleCompilationError(CorrelationError):
-    """Correlation rule failed to compile or validate."""
-
-
 # -- Disassembly / Reverse Engineering --------------------------------------
 
 class ReverseEngineeringError(DeepViewError):

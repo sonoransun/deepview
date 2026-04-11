@@ -1,0 +1,68 @@
+# Dashboard layout for the mangle workflow.
+#
+# Intended use:
+#   deepview dashboard run --layout mangle --enable-mangle \
+#       --mangle-rules rules.yaml --confirm
+#
+# The ManglePanel subscribes to NetworkPacketMangledEvent on the core
+# EventBus, so the mangle engine must be running alongside the app.
+
+refresh_hz: 6
+
+trace:
+  probes: [network, process]
+
+layout:
+  root:
+    direction: vertical
+    children:
+      - {id: top, size: 3}
+      - id: upper
+        direction: horizontal
+        children:
+          - {id: upper-left, ratio: 1}
+          - {id: upper-right, ratio: 1}
+      - id: middle
+        direction: horizontal
+        children:
+          - {id: middle-left, ratio: 2}
+          - {id: middle-right, ratio: 2}
+      - id: bottom
+        direction: horizontal
+        children:
+          - {id: bottom-left, ratio: 1}
+          - {id: bottom-right, ratio: 2}
+
+panels:
+  - name: header
+    type: header
+    region: top
+
+  - name: flow
+    type: flow_rate
+    region: upper-left
+
+  - name: top_talkers
+    type: top_talkers
+    region: upper-right
+    top_n: 10
+
+  - name: connections
+    type: connections
+    region: middle-left
+    max_rows: 12
+
+  - name: mangle
+    type: mangle
+    region: middle-right
+
+  - name: alerts
+    type: alerts
+    region: bottom-left
+    max_rows: 8
+
+  - name: events
+    type: event_tail
+    region: bottom-right
+    max_rows: 10
+    filter: 'category == "network"'

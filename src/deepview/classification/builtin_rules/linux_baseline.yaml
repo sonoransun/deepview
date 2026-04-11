@@ -1,0 +1,85 @@
+# Deep View Linux baseline classification ruleset.
+#
+# These rules cover a starter set of Linux-side behaviours that are
+# cheap to classify live and high-signal for forensic triage. They
+# reference the MonitorEvent schema via the same FilterExpr DSL that
+# the CLI --filter flag accepts.
+#
+# Severity scale: info | warning | critical.
+#
+# Rules that need richer event shapes (e.g. argv, envp) will start
+# firing once Slice 2's exec_full.bpf.c replaces the Slice 1
+# raw_syscalls template for 'deepview trace process'. Until then,
+# they stay dormant on syscall_raw events without producing false
+# positives.
+
+rules:
+  - id: linux.exec.worldwritable
+    title: Execve from world-writable path
+    severity: critical
+    category: execution
+    attack_ids: [T1204, T1203]
+    match: 'syscall_name == "execve" and (args.filename glob "/tmp/*" or args.filename glob "/dev/shm/*" or args.filename glob "/var/tmp/*")'
+    labels:
+      tactic: execution
+      source: deepview.builtin.linux_baseline
+
+  - id: linux.exec.ld_preload
+    title: Execve with LD_PRELOAD set
+    severity: warning
+    category: defense_evasion
+    attack_ids: [T1574.006]
+    match: 'syscall_name == "execve" and args.env contains "LD_PRELOAD="'
+    labels:
+      tactic: defense_evasion
+      source: deepview.builtin.linux_baseline
+
+  - id: linux.ptrace.attach_nonchild
+    title: ptrace_attach of a non-child process
+    severity: warning
+    category: defense_evasion
+    attack_ids: [T1055.008]
+    match: 'syscall_name == "ptrace"'
+    labels:
+      tactic: defense_evasion
+      source: deepview.builtin.linux_baseline
+
+  - id: linux.module.load_nonstandard
+    title: Kernel module loaded from non-standard path
+    severity: critical
+    category: persistence
+    attack_ids: [T1547.006]
+    match: 'category == "module" and syscall_name == "module_loaded" and not args.module contains "/lib/modules/"'
+    labels:
+      tactic: persistence
+      source: deepview.builtin.linux_baseline
+
+  - id: linux.signal.kill_init
+    title: Signal sent to init (pid 1)
+    severity: critical
+    category: impact
+    attack_ids: [T1489]
+    match: 'syscall_name == "kill" and args.target_pid == 1'
+    labels:
+      tactic: impact
+      source: deepview.builtin.linux_baseline
+
+  - id: linux.mount.in_container
+    title: mount/umount syscall from inside a container namespace
+    severity: warning
+    category: privilege_escalation
+    attack_ids: [T1611]
+    match: 'syscall_name in ["mount", "umount2"]'
+    labels:
+      tactic: privilege_escalation
+      source: deepview.builtin.linux_baseline
+
+  - id: linux.proc.new_from_cron
+    title: cron spawned a shell child
+    severity: info
+    category: execution
+    attack_ids: [T1053.003]
+    match: 'process.comm == "sh" and args.ppid_comm == "cron"'
+    labels:
+      tactic: execution
+      source: deepview.builtin.linux_baseline

@@ -7,7 +7,6 @@ from deepview.core.logging import get_logger
 from deepview.core.platform import detect_platform
 from deepview.core.types import Platform
 from deepview.core.exceptions import MonitorError
-from deepview.tracing.events import MonitorEvent
 from deepview.tracing.filters import FilterExpr
 from deepview.tracing.stream import TraceEventBus, EventSubscription
 from deepview.tracing.providers.base import ProbeSpec, MonitorBackend
@@ -27,6 +26,29 @@ class TraceManager:
         self._bus = TraceEventBus()
         self._running = False
         self._consumer_tasks: list[asyncio.Task] = []
+        self._backend_override: list[MonitorBackend] | None = None
+
+    @classmethod
+    def from_context(cls, context: AnalysisContext) -> "TraceManager":
+        """Build a manager pre-wired to *context*.
+
+        A convenience factory so CLI commands do not need to reach into
+        the config directly. The returned instance still defers backend
+        creation until :meth:`start` so tests and dry-runs stay cheap.
+        """
+        return cls(context)
+
+    def set_backend_override(self, backends: list[MonitorBackend]) -> None:
+        """Bypass auto-detection. Primarily a test hook."""
+        self._backend_override = backends
+
+    @property
+    def bus(self) -> TraceEventBus:
+        return self._bus
+
+    def create_backends(self) -> list[MonitorBackend]:
+        """Public wrapper for backend auto-detection."""
+        return self._create_backends()
 
     def _create_backends(self) -> list[MonitorBackend]:
         """Create platform-appropriate backends."""
@@ -62,14 +84,33 @@ class TraceManager:
 
     async def start(self, probes: list[ProbeSpec], filter_expr: FilterExpr | None = None) -> None:
         """Start tracing with the given probes."""
-        self._backends = self._create_backends()
+        self._backends = (
+            list(self._backend_override)
+            if self._backend_override is not None
+            else self._create_backends()
+        )
 
         if not self._backends:
-            raise MonitorError("No tracing backend available on this platform")
+            raise MonitorError(
+                "No tracing backend available on this platform. "
+                "Run 'deepview doctor' for capability details."
+            )
+
+        plan = filter_expr.compile() if filter_expr is not None else None
+        if plan is not None:
+            hints = plan.kernel_hints
+            log.info(
+                "filter_compiled",
+                pids=len(hints.pids),
+                uids=len(hints.uids),
+                comms=len(hints.comms),
+                syscall_nrs=len(hints.syscall_nrs),
+                categories=len(hints.categories),
+            )
 
         for backend in self._backends:
-            if filter_expr:
-                result = backend.apply_filter(filter_expr)
+            if plan is not None:
+                result = backend.apply_filter(plan)
                 log.info("filter_pushdown",
                          backend=backend.backend_name,
                          pushed=len(result.pushed),

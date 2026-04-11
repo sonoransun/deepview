@@ -7,7 +7,6 @@ from deepview.core.events import EventBus
 from deepview.core.platform import PlatformInfo
 
 if TYPE_CHECKING:
-    from deepview.core.correlation import CorrelationEngine
     from deepview.plugins.registry import PluginRegistry
 
 
@@ -67,20 +66,6 @@ class AnalysisContext:
         self.platform = PlatformInfo.detect()
         self.artifacts = ArtifactStore()
         self._plugin_registry: PluginRegistry | None = None
-        self._correlation: CorrelationEngine | None = None
-
-    @property
-    def correlation(self) -> CorrelationEngine:
-        """Lazy-initialised cross-subsystem correlation engine.
-
-        Created on first access so tests and subsystems that never touch the
-        correlator pay no import-time cost.
-        """
-        if self._correlation is None:
-            from deepview.core.correlation import CorrelationEngine
-            self._correlation = CorrelationEngine(event_bus=self.events)
-            self._correlation.register_default_rules()
-        return self._correlation
 
     @property
     def plugins(self) -> PluginRegistry:

@@ -55,6 +55,42 @@ class SideChannelConfig(BaseSettings):
     sample_rate_hz: int = 20_000_000
 
 
+class ClassificationConfig(BaseSettings):
+    enabled: bool = True
+    ruleset_paths: list[str] = Field(default_factory=list)
+    load_builtin: bool = True
+    anomaly_window_s: float = 30.0
+    auto_inspect_on_severity: str = "critical"
+
+
+class ReplayConfig(BaseSettings):
+    store_path: Path = Path(user_cache_dir(_APP_NAME)) / "sessions"
+    circular_buffer_seconds: float = 60.0
+    snapshot_interval_s: float = 5.0
+
+
+class MonitorConfig(BaseSettings):
+    default_ruleset: str = ""
+    refresh_hz: float = 4.0
+    max_rows: int = 25
+
+
+class DashboardConfig(BaseSettings):
+    default_layout: str = "network"
+    refresh_hz: float = 4.0
+    config_path: str = ""
+
+
+class NetworkMangleConfig(BaseSettings):
+    queue_num: int = 42
+    state_dir: Path = Path(user_cache_dir(_APP_NAME)) / "mangle"
+    dry_run_default: bool = False
+    fail_open: bool = True
+    iptables_chain: str = "OUTPUT"
+    iptables_table: str = "mangle"
+    iptables_binary: str = "iptables"
+
+
 class DisassemblyConfig(BaseSettings):
     default_engine: str = "auto"
     ghidra_install_dir: str = ""
@@ -85,6 +121,11 @@ class DeepViewConfig(BaseSettings):
     gpu: GPUConfig = Field(default_factory=GPUConfig)
     sidechannel: SideChannelConfig = Field(default_factory=SideChannelConfig)
     disassembly: DisassemblyConfig = Field(default_factory=DisassemblyConfig)
+    classification: ClassificationConfig = Field(default_factory=ClassificationConfig)
+    replay: ReplayConfig = Field(default_factory=ReplayConfig)
+    monitor: MonitorConfig = Field(default_factory=MonitorConfig)
+    dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
+    network_mangle: NetworkMangleConfig = Field(default_factory=NetworkMangleConfig)
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> DeepViewConfig:

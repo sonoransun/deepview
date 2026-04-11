@@ -2,9 +2,6 @@
 from __future__ import annotations
 import asyncio
 import threading
-from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
-from typing import Callable
 from deepview.tracing.events import MonitorEvent
 from deepview.tracing.filters import FilterExpr
 
@@ -66,7 +63,7 @@ class EventSubscription:
     def dropped_count(self) -> int:
         return self._dropped
 
-    async def __aiter__(self) -> AsyncIterator[MonitorEvent]:
+    def __aiter__(self) -> "EventSubscription":
         return self
 
     async def __anext__(self) -> MonitorEvent:

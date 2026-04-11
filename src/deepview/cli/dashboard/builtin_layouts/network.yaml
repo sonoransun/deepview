@@ -1,0 +1,65 @@
+# Network-focused dashboard layout.
+#
+# Renders a 4-row Rich layout:
+#   - top:     host header
+#   - middle:  flow sparkline | top talkers
+#   - center:  live /proc/net connection table
+#   - bottom:  classifier alerts | event tail
+#
+# Assumes the dashboard CLI has started a TraceManager with network
+# + process probes. Panel-level filter expressions use the same DSL
+# as deepview trace --filter.
+
+refresh_hz: 6
+
+trace:
+  probes: [network, process]
+
+layout:
+  root:
+    direction: vertical
+    children:
+      - {id: top, size: 3}
+      - id: middle
+        direction: horizontal
+        children:
+          - {id: middle-left, ratio: 1}
+          - {id: middle-right, ratio: 2}
+      - {id: center, ratio: 3}
+      - id: bottom
+        direction: horizontal
+        children:
+          - {id: bottom-left, ratio: 1}
+          - {id: bottom-right, ratio: 2}
+
+panels:
+  - name: header
+    type: header
+    region: top
+
+  - name: flow
+    type: flow_rate
+    region: middle-left
+    window_s: 60
+
+  - name: top_talkers
+    type: top_talkers
+    region: middle-right
+    top_n: 10
+
+  - name: connections
+    type: connections
+    region: center
+    refresh_s: 2
+    max_rows: 15
+
+  - name: alerts
+    type: alerts
+    region: bottom-left
+    max_rows: 8
+
+  - name: events
+    type: event_tail
+    region: bottom-right
+    max_rows: 12
+    filter: 'category == "network"'

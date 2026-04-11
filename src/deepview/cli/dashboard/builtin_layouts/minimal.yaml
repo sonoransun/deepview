@@ -1,0 +1,23 @@
+# Minimal single-pane layout: header + event tail only.
+
+refresh_hz: 10
+
+trace:
+  probes: [process]
+
+layout:
+  root:
+    direction: vertical
+    children:
+      - {id: top, size: 3}
+      - {id: body, ratio: 1}
+
+panels:
+  - name: header
+    type: header
+    region: top
+
+  - name: events
+    type: event_tail
+    region: body
+    max_rows: 25

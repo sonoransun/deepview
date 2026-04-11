@@ -1,9 +1,9 @@
 """Abstract monitor backend protocol."""
 from __future__ import annotations
-from typing import Protocol, AsyncIterator, runtime_checkable
+from typing import Protocol, AsyncIterator, Union, runtime_checkable
 from dataclasses import dataclass, field
 from deepview.tracing.events import MonitorEvent
-from deepview.tracing.filters import FilterExpr, FilterRule
+from deepview.tracing.filters import FilterExpr, FilterPlan, FilterRule
 from deepview.core.types import EventCategory, ProbeType
 
 
@@ -22,6 +22,9 @@ class ProbeSpec:
 class FilterPushDownResult:
     pushed: list[FilterRule] = field(default_factory=list)
     remaining: list[FilterRule] = field(default_factory=list)
+
+
+FilterInput = Union[FilterExpr, FilterPlan]
 
 
 @dataclass
@@ -48,6 +51,6 @@ class MonitorBackend(Protocol):
 
     async def events(self) -> AsyncIterator[MonitorEvent]: ...
 
-    def apply_filter(self, filter_expr: FilterExpr) -> FilterPushDownResult: ...
+    def apply_filter(self, filter_expr: FilterInput) -> FilterPushDownResult: ...
 
     def get_stats(self) -> BackendStats: ...

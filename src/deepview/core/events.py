@@ -1,8 +1,7 @@
 from __future__ import annotations
-import asyncio
 import threading
 from collections import defaultdict
-from typing import Any, Callable
+from typing import Callable
 
 class Event:
     """Base event class. Subclass for specific event types."""
@@ -44,13 +43,7 @@ class ArtifactRecoveredEvent(Event):
 
 
 class MemoryDiffEvent(Event):
-    def __init__(
-        self,
-        changed_pages: list[int],
-        new_pages: list[int],
-        removed_pages: list[int],
-        change_rate: float = 0.0,
-    ) -> None:
+    def __init__(self, changed_pages, new_pages, removed_pages, change_rate=0.0):
         self.changed_pages = changed_pages
         self.new_pages = new_pages
         self.removed_pages = removed_pages
@@ -58,17 +51,94 @@ class MemoryDiffEvent(Event):
 
 
 class BaselineDeviationEvent(Event):
-    def __init__(
-        self,
-        category: str,
-        description: str,
-        severity: str = "warning",
-        evidence: dict | None = None,
-    ) -> None:
+    def __init__(self, category, description, severity="warning", evidence=None):
         self.category = category
         self.description = description
         self.severity = severity
         self.evidence = evidence or {}
+
+
+class NetworkPacketObservedEvent(Event):
+    """Emitted for every packet the mangle engine sees."""
+
+    def __init__(
+        self,
+        *,
+        ts_ns: int,
+        direction: str,
+        ip_version: int,
+        src: str,
+        dst: str,
+        proto: str,
+        sport: int,
+        dport: int,
+        length: int,
+    ) -> None:
+        self.ts_ns = ts_ns
+        self.direction = direction
+        self.ip_version = ip_version
+        self.src = src
+        self.dst = dst
+        self.proto = proto
+        self.sport = sport
+        self.dport = dport
+        self.length = length
+
+
+class NetworkPacketMangledEvent(Event):
+    """Emitted for every matched mangle action.
+
+    The dashboard's :class:`ManglePanel` subscribes to this class via
+    the core :class:`EventBus` and uses it to drive its counters,
+    top-rules view, and recent-actions table.
+    """
+
+    def __init__(
+        self,
+        *,
+        ts_ns: int,
+        rule_id: str,
+        action: str,
+        verdict: str,
+        direction: str,
+        description: str = "",
+        remote: str = "",
+        pid_guess: int = 0,
+        comm_guess: str = "",
+        before_bytes: int = 0,
+        after_bytes: int = 0,
+    ) -> None:
+        self.ts_ns = ts_ns
+        self.rule_id = rule_id
+        self.action = action
+        self.verdict = verdict
+        self.direction = direction
+        self.description = description
+        self.remote = remote
+        self.pid_guess = pid_guess
+        self.comm_guess = comm_guess
+        self.before_bytes = before_bytes
+        self.after_bytes = after_bytes
+
+
+class EventClassifiedEvent(Event):
+    """Published by the classifier when a live event matches a rule."""
+
+    def __init__(
+        self,
+        source_event,
+        rule_id: str,
+        severity: str,
+        labels: dict[str, str] | None = None,
+        attack_ids: list[str] | None = None,
+        title: str = "",
+    ):
+        self.source_event = source_event
+        self.rule_id = rule_id
+        self.severity = severity
+        self.labels = labels or {}
+        self.attack_ids = attack_ids or []
+        self.title = title
 
 class EventBus:
     """Decoupled publish-subscribe event distribution."""
