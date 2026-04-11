@@ -44,13 +44,27 @@ class ProbeType(str, enum.Enum):
 
 class EventCategory(str, enum.Enum):
     PROCESS = "process"
+    PROCESS_EXEC = "process_exec"
+    PROCESS_FORK = "process_fork"
+    PROCESS_EXIT = "process_exit"
     FILE_IO = "file_io"
+    FILE_ACCESS = "file_access"
     NETWORK = "network"
+    NETWORK_CONNECT = "network_connect"
+    NETWORK_LISTEN = "network_listen"
     MEMORY = "memory"
+    MEMORY_MAP = "memory_map"
     MODULE = "module"
+    MODULE_LOAD = "module_load"
     REGISTRY = "registry"
     SIGNAL = "signal"
     SYSCALL_RAW = "syscall_raw"
+    CRED_TRANSITION = "cred_transition"
+    PTRACE = "ptrace"
+    BPF_LOAD = "bpf_load"
+    CONTAINER = "container"
+    DNS = "dns"
+    TLS = "tls"
 
 
 class EventSeverity(str, enum.Enum):
@@ -84,15 +98,123 @@ class DisassemblyBackend(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 
-class ProcessContext(BaseModel):
-    pid: int
+class ModuleInfo(BaseModel):
+    """A loaded binary module (shared lib, DLL, kext, kernel module)."""
+
+    name: str
+    base_address: int = 0
+    size: int = 0
+    path: str = ""
+
+
+class FdInfo(BaseModel):
+    """Open file descriptor / handle on a process."""
+
+    fd: int
+    kind: str = ""  # "file", "socket", "pipe", "anon_inode", "eventfd", ...
+    target: str = ""  # path, "socket:[inode]", ...
+    flags: int = 0
+
+
+class ThreadInfo(BaseModel):
+    """A single thread within a process."""
+
     tid: int
-    ppid: int
-    uid: int
-    gid: int
-    comm: str
+    start_address: int = 0
+    state: str = ""
+    name: str = ""
+
+
+class NamespaceSet(BaseModel):
+    """Linux namespace identifiers (inode numbers)."""
+
+    mnt: int | None = None
+    pid: int | None = None
+    net: int | None = None
+    user: int | None = None
+    uts: int | None = None
+    ipc: int | None = None
+    cgroup: int | None = None
+    time: int | None = None
+
+
+class SigningInfo(BaseModel):
+    """Executable signing metadata (Authenticode / codesign / IMA)."""
+
+    signed: bool = False
+    signer: str = ""
+    subject: str = ""
+    team_id: str = ""  # macOS codesign team identifier
+    signing_chain: list[str] = Field(default_factory=list)
+    verified: bool = False
+
+
+class ProcessContext(BaseModel):
+    """Rich process identity + forensic state.
+
+    Only ``pid`` / ``tid`` / ``comm`` are effectively mandatory; every other
+    field has a sensible default so call-sites can populate incrementally as
+    richer data becomes available.
+    """
+
+    pid: int
+    tid: int = 0
+    ppid: int = 0
+    uid: int = 0
+    gid: int = 0
+    comm: str = ""
     exe_path: str = ""
     cgroup: str = ""
+
+    # Expanded identity
+    cmdline: list[str] = Field(default_factory=list)
+    cwd: str = ""
+    env: dict[str, str] = Field(default_factory=dict)
+
+    # Executable integrity
+    exe_hash_sha256: str = ""
+    exe_signing: SigningInfo | None = None
+
+    # Runtime state
+    loaded_modules: list[ModuleInfo] = Field(default_factory=list)
+    open_fds: list[FdInfo] = Field(default_factory=list)
+    threads: list[ThreadInfo] = Field(default_factory=list)
+
+    # Session / TTY
+    tty: str = ""
+    session_id: int | None = None
+    auid: int | None = None  # Linux audit UID (survives setuid)
+
+    # Containment / sandbox
+    namespaces: NamespaceSet | None = None
+    cgroup_path: str = ""
+    container_id: str = ""
+    k8s_pod: str = ""
+    k8s_namespace: str = ""
+
+    # Privilege context (Linux)
+    capabilities_effective: int = 0
+    capabilities_permitted: int = 0
+    selinux_context: str = ""
+    apparmor_profile: str = ""
+
+    # Privilege context (Windows)
+    integrity_level: str = ""
+    token_privileges: list[str] = Field(default_factory=list)
+
+    # Ancestry
+    parent_chain: list[int] = Field(default_factory=list)  # pids from pid up to init
+
+    def stable_key(self, boot_ns: int | None = None) -> str:
+        """Return a stable entity key ``process:<pid>@<boot_ns>``.
+
+        ``boot_ns`` is an optional boot-time anchor so that PID reuse across
+        reboots still produces distinct entities. If omitted the bare pid is
+        used.
+        """
+        if boot_ns is None:
+            return f"process:{self.pid}"
+        return f"process:{self.pid}@{boot_ns}"
 
 
 class EventSource(BaseModel):
@@ -158,13 +280,6 @@ class ScanResult(BaseModel):
     rule_name: str = ""
     data: bytes = b""
     metadata: dict = Field(default_factory=dict)
-
-
-class ModuleInfo(BaseModel):
-    name: str
-    base_address: int
-    size: int
-    path: str = ""
 
 
 # ---------------------------------------------------------------------------

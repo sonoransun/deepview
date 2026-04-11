@@ -41,6 +41,8 @@ from deepview.cli.commands.instrument import instrument
 from deepview.cli.commands.scan import scan
 from deepview.cli.commands.report import report
 from deepview.cli.commands.disassemble import disassemble
+from deepview.cli.commands.persistence import persistence
+from deepview.cli.commands.baseline import baseline
 
 main.add_command(memory)
 main.add_command(vm)
@@ -49,6 +51,8 @@ main.add_command(instrument)
 main.add_command(scan)
 main.add_command(report)
 main.add_command(disassemble)
+main.add_command(persistence)
+main.add_command(baseline)
 
 # Add plugin list command at root level
 @main.command("plugins")

@@ -97,3 +97,63 @@ class FilterExpr:
     def category_filter(cls, category: str) -> FilterExpr:
         """Convenience: filter by event category."""
         return cls("and", [FilterRule("category", "eq", category)])
+
+    @classmethod
+    def path_filter(cls, path_glob: str) -> FilterExpr:
+        """Convenience: filter by file-access path (glob)."""
+        return cls("and", [FilterRule("args.path", "glob", path_glob)])
+
+
+# Fields eligible for kernel-side push-down across backends. The backend
+# decides which of these it can actually compile; the rest stay in user
+# space. Using a module-level set keeps all providers in sync.
+PUSH_DOWN_FIELDS: set[str] = {
+    "process.pid",
+    "process.uid",
+    "process.comm",
+    "args.path",
+    "args.protocol",
+    "args.dst_port",
+    "args.src_port",
+    "category",
+}
+
+
+def split_for_pushdown(
+    filter_expr: FilterExpr | None,
+    *,
+    supported_fields: set[str] | None = None,
+) -> tuple[list[FilterRule], list[FilterRule]]:
+    """Split a filter tree into kernel-pushable and residual rules.
+
+    Only leaf ``FilterRule`` nodes inside a top-level ``and`` expression can be
+    pushed down — OR / NOT semantics would require more delicate treatment and
+    are left for future work.
+    """
+    if filter_expr is None:
+        return [], []
+    allowed = supported_fields or PUSH_DOWN_FIELDS
+    pushed: list[FilterRule] = []
+    remaining: list[FilterRule] = []
+    if filter_expr.op != "and":
+        # Flatten only AND trees; hand everything else back as residual.
+        residual = _collect_rules(filter_expr)
+        return [], residual
+    for child in filter_expr.children:
+        if isinstance(child, FilterRule):
+            if child.field_path in allowed and child.op in ("eq", "glob", "in"):
+                pushed.append(child)
+            else:
+                remaining.append(child)
+        else:
+            remaining.extend(_collect_rules(child))
+    return pushed, remaining
+
+
+def _collect_rules(expr: FilterExpr | FilterRule) -> list[FilterRule]:
+    if isinstance(expr, FilterRule):
+        return [expr]
+    out: list[FilterRule] = []
+    for child in expr.children:
+        out.extend(_collect_rules(child))
+    return out

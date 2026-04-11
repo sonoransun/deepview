@@ -8,8 +8,8 @@ from collections.abc import AsyncIterator
 from deepview.core.logging import get_logger
 from deepview.core.types import EventCategory, EventSeverity, EventSource, ProcessContext
 from deepview.core.exceptions import BackendNotAvailableError
-from deepview.tracing.events import MonitorEvent
-from deepview.tracing.filters import FilterExpr
+from deepview.tracing.events import MonitorEvent, exec_event
+from deepview.tracing.filters import FilterExpr, split_for_pushdown
 from deepview.tracing.providers.base import ProbeSpec, FilterPushDownResult, BackendStats
 from deepview.utils.process import find_tool
 
@@ -76,7 +76,10 @@ class DTraceBackend:
                 continue
 
     def apply_filter(self, filter_expr: FilterExpr) -> FilterPushDownResult:
-        return FilterPushDownResult()
+        pushed, remaining = split_for_pushdown(
+            filter_expr, supported_fields={"process.pid"}
+        )
+        return FilterPushDownResult(pushed=pushed, remaining=remaining)
 
     def get_stats(self) -> BackendStats:
         self._stats.uptime_seconds = time.time() - self._start_time if self._start_time else 0
@@ -85,25 +88,36 @@ class DTraceBackend:
     def _generate_dtrace_script(self, probes: list[ProbeSpec]) -> str:
         """Generate DTrace D script from probe specs."""
         lines = []
+        want_syscall = False
+        want_exec = False
+        want_signal = False
         for probe in probes:
-            if probe.category == EventCategory.SYSCALL_RAW:
-                target = probe.target or "*"
-                lines.append(
-                    f'syscall::{target}:entry '
-                    f'{{ printf("DVE|%d|%d|%d|%s|%s\\n", pid, tid, ppid, execname, probefunc); }}'
-                )
-            elif probe.category == EventCategory.PROCESS:
-                lines.append(
-                    'proc:::exec-success '
-                    '{ printf("DVE|%d|%d|%d|%s|exec\\n", pid, tid, ppid, execname); }'
-                )
-
+            if probe.category in (EventCategory.SYSCALL_RAW, EventCategory.FILE_IO, EventCategory.FILE_ACCESS):
+                want_syscall = True
+            if probe.category in (EventCategory.PROCESS, EventCategory.PROCESS_EXEC):
+                want_exec = True
+            if probe.category in (EventCategory.SIGNAL, EventCategory.PTRACE):
+                want_signal = True
+        if want_syscall:
+            lines.append(
+                'syscall:::entry '
+                '{ printf("DVE|syscall|%d|%d|%d|%s|%s\\n", pid, tid, ppid, execname, probefunc); }'
+            )
+        if want_exec:
+            lines.append(
+                'proc:::exec-success '
+                '{ printf("DVE|exec|%d|%d|%d|%s|%s\\n", pid, tid, ppid, execname, probefunc); }'
+            )
+        if want_signal:
+            lines.append(
+                'proc:::signal-send '
+                '{ printf("DVE|signal|%d|%d|%d|%s|%d\\n", pid, tid, ppid, execname, args[2]); }'
+            )
         if not lines:
             lines.append(
                 'syscall:::entry '
-                '{ printf("DVE|%d|%d|%d|%s|%s\\n", pid, tid, ppid, execname, probefunc); }'
+                '{ printf("DVE|syscall|%d|%d|%d|%s|%s\\n", pid, tid, ppid, execname, probefunc); }'
             )
-
         return "\n".join(lines)
 
     async def _read_output(self) -> None:
@@ -132,24 +146,48 @@ class DTraceBackend:
                     break
 
     def _parse_event(self, line: str) -> MonitorEvent | None:
-        """Parse a DVE| formatted line into a MonitorEvent."""
+        """Parse a DVE| formatted line into a MonitorEvent.
+
+        New line format: ``DVE|<kind>|<pid>|<tid>|<ppid>|<comm>|<detail>``
+        where ``kind`` is one of ``syscall`` / ``exec`` / ``signal``.
+        """
         try:
             parts = line.split("|")
-            if len(parts) < 6:
+            if len(parts) < 7:
                 return None
+            kind = parts[1]
+            proc = ProcessContext(
+                pid=int(parts[2]),
+                tid=int(parts[3]),
+                ppid=int(parts[4]),
+                uid=0,
+                gid=0,
+                comm=parts[5],
+            )
+            source = EventSource(platform="darwin", backend="dtrace", probe_name=kind)
+            ts = time.time_ns()
+            if kind == "exec":
+                return exec_event(
+                    process=proc,
+                    argv=[parts[6]],
+                    source=source,
+                    timestamp_ns=ts,
+                )
+            if kind == "signal":
+                return MonitorEvent(
+                    timestamp_ns=ts,
+                    category=EventCategory.SIGNAL,
+                    source=source,
+                    process=proc,
+                    syscall_name="signal",
+                    args={"signal": int(parts[6]) if parts[6].isdigit() else 0},
+                )
             return MonitorEvent(
-                timestamp_ns=time.time_ns(),
+                timestamp_ns=ts,
                 category=EventCategory.SYSCALL_RAW,
-                source=EventSource(platform="darwin", backend="dtrace", probe_name="syscall"),
-                process=ProcessContext(
-                    pid=int(parts[1]),
-                    tid=int(parts[2]),
-                    ppid=int(parts[3]),
-                    uid=0,
-                    gid=0,
-                    comm=parts[4],
-                ),
-                syscall_name=parts[5],
+                source=source,
+                process=proc,
+                syscall_name=parts[6],
             )
         except (ValueError, IndexError):
             return None

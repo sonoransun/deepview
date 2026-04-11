@@ -44,7 +44,13 @@ class ArtifactRecoveredEvent(Event):
 
 
 class MemoryDiffEvent(Event):
-    def __init__(self, changed_pages, new_pages, removed_pages, change_rate=0.0):
+    def __init__(
+        self,
+        changed_pages: list[int],
+        new_pages: list[int],
+        removed_pages: list[int],
+        change_rate: float = 0.0,
+    ) -> None:
         self.changed_pages = changed_pages
         self.new_pages = new_pages
         self.removed_pages = removed_pages
@@ -52,7 +58,13 @@ class MemoryDiffEvent(Event):
 
 
 class BaselineDeviationEvent(Event):
-    def __init__(self, category, description, severity="warning", evidence=None):
+    def __init__(
+        self,
+        category: str,
+        description: str,
+        severity: str = "warning",
+        evidence: dict | None = None,
+    ) -> None:
         self.category = category
         self.description = description
         self.severity = severity

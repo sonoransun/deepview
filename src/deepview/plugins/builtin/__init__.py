@@ -8,3 +8,5 @@ from deepview.plugins.builtin import credentials
 from deepview.plugins.builtin import pagetable_walk
 from deepview.plugins.builtin import strings
 from deepview.plugins.builtin import command_history
+from deepview.plugins.builtin import persistence
+from deepview.plugins.builtin import rootkit_diff
