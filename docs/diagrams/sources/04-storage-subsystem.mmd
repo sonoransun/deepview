@@ -1,0 +1,70 @@
+graph TB
+    SM["storage.manager<br/>(StorageManager)"]:::mgr
+
+    subgraph Formats["formats/"]
+        RAW["raw_nand"]:::mod
+        MTD["mtd"]:::mod
+        UBI["ubi"]:::mod
+    end
+
+    subgraph ECC["ecc/"]
+        BCH["bch"]:::mod
+        HAM["hamming"]:::mod
+        RS["reed_solomon"]:::mod
+    end
+
+    subgraph FTL["ftl/"]
+        LIN["linearized"]:::mod
+        BM["block_map"]:::mod
+    end
+
+    subgraph Encodings["encodings/"]
+        LZ4["lz4"]:::mod
+        ZSTD["zstd"]:::mod
+    end
+
+    subgraph Filesystems["filesystems/"]
+        FAT["fat"]:::mod
+        EXT["ext"]:::mod
+        APFS["apfs"]:::mod
+        TSK["tsk"]:::mod
+        REG["registry.register_all()"]:::reg
+    end
+
+    subgraph Partition["partition/"]
+        MBR["mbr"]:::mod
+        GPT["gpt"]:::mod
+    end
+
+    subgraph Containers["containers/"]
+        LUKS["luks"]:::mod
+        BL["bitlocker"]:::mod
+        VC["veracrypt"]:::mod
+        FV2["filevault2"]:::mod
+        UO["unlock.UnlockOrchestrator"]:::reg
+    end
+
+    AUTO["auto.py<br/>(orchestrator:<br/>wrap NAND -> ECC -> FTL -><br/>partition -> fs probe)"]:::auto
+
+    SM --> Formats
+    SM --> ECC
+    SM --> FTL
+    SM --> Encodings
+    SM --> Filesystems
+    SM --> Partition
+    SM --> Containers
+    SM --> AUTO
+    REG -.registers.-> SM
+    UO -.uses.-> AUTO
+
+    AUTO --> Formats
+    AUTO --> ECC
+    AUTO --> FTL
+    AUTO --> Partition
+    AUTO --> Filesystems
+    AUTO --> Containers
+
+    classDef mgr fill:#1e1e2e,stroke:#f9e2af,color:#cdd6f4
+    classDef mod fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    classDef reg fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    classDef auto fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4

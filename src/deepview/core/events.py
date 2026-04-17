@@ -140,6 +140,136 @@ class EventClassifiedEvent(Event):
         self.attack_ids = attack_ids or []
         self.title = title
 
+
+# ---------------------------------------------------------------------------
+# Container unlock events
+# ---------------------------------------------------------------------------
+
+
+class ContainerUnlockStartedEvent(Event):
+    """Emitted when an unlock attempt against an encrypted container begins."""
+
+    def __init__(self, *, format: str, layer: str, key_source: str) -> None:
+        self.format = format
+        self.layer = layer
+        self.key_source = key_source
+
+
+class ContainerUnlockProgressEvent(Event):
+    """Periodic progress for a multi-step unlock (KDF iterations, key tries)."""
+
+    def __init__(self, *, format: str, stage: str, attempted: int, total: int) -> None:
+        self.format = format
+        self.stage = stage
+        self.attempted = attempted
+        self.total = total
+
+
+class ContainerUnlockedEvent(Event):
+    """Successful unlock; *produced_layer* is the registered name of the plaintext layer."""
+
+    def __init__(
+        self,
+        *,
+        format: str,
+        layer: str,
+        produced_layer: str,
+        elapsed_s: float,
+    ) -> None:
+        self.format = format
+        self.layer = layer
+        self.produced_layer = produced_layer
+        self.elapsed_s = elapsed_s
+
+
+class ContainerUnlockFailedEvent(Event):
+    """Unlock attempt exhausted all candidate keys / passphrases."""
+
+    def __init__(self, *, format: str, layer: str, reason: str) -> None:
+        self.format = format
+        self.layer = layer
+        self.reason = reason
+
+
+# ---------------------------------------------------------------------------
+# Remote acquisition events
+# ---------------------------------------------------------------------------
+
+
+class RemoteAcquisitionStartedEvent(Event):
+    def __init__(self, *, endpoint: str, transport: str, output: str) -> None:
+        self.endpoint = endpoint
+        self.transport = transport
+        self.output = output
+
+
+class RemoteAcquisitionProgressEvent(Event):
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        bytes_done: int,
+        bytes_total: int,
+        stage: str,
+    ) -> None:
+        self.endpoint = endpoint
+        self.bytes_done = bytes_done
+        self.bytes_total = bytes_total
+        self.stage = stage
+
+
+class RemoteAcquisitionCompletedEvent(Event):
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        output: str,
+        size_bytes: int,
+        elapsed_s: float,
+    ) -> None:
+        self.endpoint = endpoint
+        self.output = output
+        self.size_bytes = size_bytes
+        self.elapsed_s = elapsed_s
+
+
+# ---------------------------------------------------------------------------
+# Offload events
+# ---------------------------------------------------------------------------
+
+
+class OffloadJobSubmittedEvent(Event):
+    def __init__(self, *, job_id: str, kind: str, backend: str, cost_hint: int) -> None:
+        self.job_id = job_id
+        self.kind = kind
+        self.backend = backend
+        self.cost_hint = cost_hint
+
+
+class OffloadJobProgressEvent(Event):
+    def __init__(self, *, job_id: str, fraction: float, message: str = "") -> None:
+        self.job_id = job_id
+        self.fraction = fraction
+        self.message = message
+
+
+class OffloadJobCompletedEvent(Event):
+    def __init__(
+        self,
+        *,
+        job_id: str,
+        ok: bool,
+        elapsed_s: float,
+        backend: str,
+        error: str | None = None,
+    ) -> None:
+        self.job_id = job_id
+        self.ok = ok
+        self.elapsed_s = elapsed_s
+        self.backend = backend
+        self.error = error
+
+
 class EventBus:
     """Decoupled publish-subscribe event distribution."""
 

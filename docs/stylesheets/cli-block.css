@@ -1,0 +1,91 @@
+/* Deep View CLI code-block styling.
+ *
+ * Works together with javascripts/copy-cli-blocks.js which tags eligible
+ * <pre> blocks with the .deepview-cli class and wraps the "$" prompt and
+ * "deepview" token in <span> elements.
+ */
+
+.md-typeset pre.deepview-cli {
+  position: relative;
+  border-left: 3px solid #cba6f7;
+  padding-right: 4.5rem;
+}
+
+.md-typeset pre.deepview-cli::before {
+  content: "CLI";
+  position: absolute;
+  top: 0.35rem;
+  left: 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #cba6f7;
+  text-transform: uppercase;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Dim the "$" prompt so the command itself is the visual anchor. */
+.md-typeset pre.deepview-cli code .deepview-prompt {
+  color: #6c7086;
+  opacity: 0.7;
+  user-select: none;
+  margin-right: 0.35em;
+}
+
+/* Highlight the "deepview" token in mauve so it's obvious at a glance. */
+.md-typeset pre.deepview-cli code .deepview-cmd {
+  color: #cba6f7;
+  font-weight: 600;
+}
+
+/* Copy-as-one-liner button. */
+.deepview-copy-oneliner {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.15rem 0.55rem;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #cdd6f4;
+  background: rgba(49, 50, 68, 0.85);
+  border: 1px solid rgba(203, 166, 247, 0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease,
+    color 120ms ease, transform 120ms ease;
+  z-index: 2;
+}
+
+.deepview-copy-oneliner:hover {
+  background: rgba(203, 166, 247, 0.18);
+  border-color: #cba6f7;
+  color: #f5e0dc;
+}
+
+.deepview-copy-oneliner:active {
+  transform: scale(0.96);
+}
+
+.deepview-copy-oneliner:focus-visible {
+  outline: 2px solid #94e2d5;
+  outline-offset: 2px;
+}
+
+.deepview-copy-oneliner.deepview-copy-flash {
+  background: rgba(166, 227, 161, 0.2);
+  border-color: #a6e3a1;
+  color: #a6e3a1;
+}
+
+/* Mobile: keep the button usable but smaller. */
+@media (max-width: 600px) {
+  .md-typeset pre.deepview-cli {
+    padding-right: 3.6rem;
+  }
+  .deepview-copy-oneliner {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+  }
+}

@@ -1,0 +1,52 @@
+classDiagram
+    class OffloadBackend {
+        <<abstract>>
+        +str name
+        +capabilities() set
+        +is_available() bool
+        +submit(job) Future
+        +in_flight() int
+        +shutdown(wait)
+    }
+
+    class ThreadPoolBackend {
+        +name = "thread"
+        +capabilities() {"io", "lightweight"}
+        +is_available() True
+    }
+
+    class ProcessPoolBackend {
+        +name = "process"
+        +capabilities() {"cpu", "pickle"}
+        +is_available() True
+    }
+
+    class OpenCLBackend {
+        +name = "gpu-opencl"
+        +capabilities() {"gpu", "kdf", "opencl"}
+        +is_available() probe pyopencl
+    }
+
+    class CUDABackend {
+        +name = "gpu-cuda"
+        +capabilities() {"gpu", "kdf", "cuda"}
+        +is_available() probe pycuda
+    }
+
+    class RemoteWorkerBackend {
+        +name = "remote"
+        +capabilities() {"rpc", "elastic"}
+        +is_available() probe endpoint
+    }
+
+    OffloadBackend <|-- ThreadPoolBackend
+    OffloadBackend <|-- ProcessPoolBackend
+    OffloadBackend <|-- OpenCLBackend
+    OffloadBackend <|-- CUDABackend
+    OffloadBackend <|-- RemoteWorkerBackend
+
+    note for ThreadPoolBackend "Always registered (stdlib)."
+    note for ProcessPoolBackend "Default backend; KDFs are CPU-bound."
+    note for OpenCLBackend "Registered only if is_available()."
+    note for CUDABackend "Registered only if is_available()."
+    note for RemoteWorkerBackend "Elastic worker pool over RPC."

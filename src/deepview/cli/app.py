@@ -46,6 +46,12 @@ from deepview.cli.commands.inspect import inspect
 from deepview.cli.commands.monitor import monitor
 from deepview.cli.commands.dashboard import dashboard
 from deepview.cli.commands.netmangle import netmangle
+from deepview.cli.commands.offload import offload
+from deepview.cli.commands.remote_image import remote_image
+from deepview.cli.commands.storage import storage
+from deepview.cli.commands.filesystem import filesystem
+from deepview.cli.commands.unlock import unlock
+from deepview.cli.commands.unlock_native import unlock_native
 
 main.add_command(memory)
 main.add_command(vm)
@@ -59,6 +65,12 @@ main.add_command(inspect)
 main.add_command(monitor)
 main.add_command(dashboard)
 main.add_command(netmangle)
+main.add_command(offload)
+main.add_command(remote_image)
+main.add_command(storage)
+main.add_command(filesystem)
+main.add_command(unlock)
+main.add_command(unlock_native)
 
 # Add plugin list command at root level
 @main.command("plugins")
@@ -136,3 +148,30 @@ def doctor(ctx):
                 console.print(f"  [green]✓[/green] {name}")
             else:
                 console.print(f"  [red]✗[/red] {name}")
+
+    console.print("\n[bold]Storage backends:[/bold]")
+    storage_modules = [
+        ("pytsk3", "Sleuth Kit (TSK) — ext/FAT/NTFS/HFS+/ISO"),
+        ("pyfsapfs", "APFS native"),
+        ("pyfsntfs", "NTFS native + ADS/USN"),
+        ("pyfsxfs", "XFS"),
+        ("pyfsbtrfs", "Btrfs"),
+        ("pyfsf2fs", "F2FS"),
+        ("pyfshfs", "HFS+"),
+        ("pyfsext", "ext2/3/4 native"),
+        ("zstandard", "zstd compression"),
+        ("lz4", "lz4 compression"),
+        ("lzo", "lzo compression"),
+        ("reedsolo", "Reed-Solomon ECC accelerator"),
+        ("galois", "BCH GF accelerator"),
+        ("cryptography", "container decryption (AES-XTS, etc.)"),
+        ("argon2", "Argon2id KDF for LUKS2/VeraCrypt"),
+        ("paramiko", "SSH remote acquisition"),
+        ("grpc", "gRPC network agent"),
+    ]
+    for name, desc in storage_modules:
+        try:
+            __import__(name)
+            console.print(f"  [green]✓[/green] {name} — {desc}")
+        except ImportError:
+            console.print(f"  [red]✗[/red] {name} — {desc}")

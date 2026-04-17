@@ -1,0 +1,24 @@
+sequenceDiagram
+    autonumber
+    participant C as caller
+    participant E as ECCDataLayer
+    participant B as backing layer (RawNAND)
+    participant D as ECCDecoder
+
+    C->>E: read(offset, length)
+    Note over E: compute page range<br/>from NANDGeometry
+
+    loop for each NAND page in range
+        E->>B: read(page_addr, page_size + oob_size)
+        B-->>E: raw page + spare (OOB)
+        Note over E: split page_data | ecc_bytes<br/>from spare area
+        E->>D: decode(page_data, ecc_bytes)
+        alt decode succeeds
+            D-->>E: corrected bytes
+        else uncorrectable
+            D-->>E: raise / flag bad page
+            Note over E: mark region, continue
+        end
+    end
+
+    E-->>C: concatenated corrected bytes

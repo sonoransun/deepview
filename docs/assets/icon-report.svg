@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 64 64"
+     role="img"
+     aria-labelledby="dv-icon-report-title dv-icon-report-desc"
+     fill="currentColor">
+  <title id="dv-icon-report-title">Report</title>
+  <desc id="dv-icon-report-desc">A document with text lines and a folded corner,
+  representing Deep View's reporting engine (HTML, Markdown, JSON, ATT&amp;CK
+  Navigator layers, and STIX 2.1 bundles).</desc>
+  <style>svg { color: #cba6f7; }</style>
+
+  <!-- Document outline, corner folded -->
+  <path d="M14 6 L42 6 L54 18 L54 58 L14 58 Z"
+        fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Folded corner -->
+  <path d="M42 6 L42 18 L54 18"
+        fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Body text lines -->
+  <line x1="20" y1="28" x2="46" y2="28"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="20" y1="36" x2="46" y2="36"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="20" y1="44" x2="40" y2="44"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Verdict dot (a small classifier badge) -->
+  <circle cx="46" cy="50" r="3" fill="currentColor"/>
+</svg>

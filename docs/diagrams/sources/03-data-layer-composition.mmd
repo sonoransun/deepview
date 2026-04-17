@@ -1,0 +1,23 @@
+graph LR
+    RAW["RawNANDLayer<br/>raw bytes + spare area"]:::raw
+    ECC["ECCDataLayer<br/>ECC-corrected pages"]:::ecc
+    FTL["LinearizedFlashLayer<br/>LBA-translated"]:::ftl
+    PART["PartitionLayer<br/>partition-sliced"]:::part
+    DEC["DecryptedVolumeLayer<br/>plaintext extent"]:::dec
+    FS["Filesystem<br/>(FAT / ext / APFS)"]:::fs
+    OUT["file bytes"]:::out
+
+    RAW -->|"raw page + OOB"| ECC
+    ECC -->|"error-corrected page"| FTL
+    FTL -->|"contiguous LBA range"| PART
+    PART -->|"partition extent"| DEC
+    DEC -->|"cipher-decrypted sectors"| FS
+    FS -->|"structured read()"| OUT
+
+    classDef raw fill:#1e1e2e,stroke:#fab387,color:#cdd6f4
+    classDef ecc fill:#1e1e2e,stroke:#f9e2af,color:#cdd6f4
+    classDef ftl fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    classDef part fill:#1e1e2e,stroke:#94e2d5,color:#cdd6f4
+    classDef dec fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
+    classDef fs fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    classDef out fill:#1e1e2e,stroke:#f38ba8,color:#cdd6f4

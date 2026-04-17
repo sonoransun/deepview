@@ -1,0 +1,16 @@
+.mermaid-zoomed {
+  position: fixed !important;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(17, 17, 27, 0.97);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  padding: 2rem;
+}
+
+.mermaid-zoomed > * {
+  max-width: 90vw;
+  max-height: 90vh;
+}

@@ -1,0 +1,37 @@
+/* Deep View documentation extra styles */
+
+:root {
+  --md-primary-fg-color: #1e1e2e;
+  --md-accent-fg-color: #cba6f7;
+}
+
+/* Make mermaid diagrams full-width and breathable */
+.md-typeset .mermaid {
+  text-align: center;
+  background: transparent;
+  margin: 1.5rem auto;
+}
+
+/* Animated SVG demos get a subtle frame */
+.md-typeset img[src$=".svg"] {
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(203, 166, 247, 0.15);
+}
+
+/* Asciinema players blend with the page */
+.asciinema-player {
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+/* Capability matrices: tighter row spacing */
+.md-typeset table:not([class]) {
+  font-size: 0.85rem;
+}
+
+/* Subsystem cards on the home page */
+.grid.cards > ul > li {
+  border-radius: 8px;
+  border: 1px solid rgba(203, 166, 247, 0.2);
+}

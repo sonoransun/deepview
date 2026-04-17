@@ -1,0 +1,28 @@
+sequenceDiagram
+    autonumber
+    participant CTX as AnalysisContext
+    participant SM as StorageManager.__init__
+    participant R as filesystems.registry.register_all
+    participant FAT as fat adapter
+    participant TSK as tsk adapter
+    participant APFS as apfs adapter
+
+    CTX->>SM: context.storage (lazy property)
+    SM->>R: register_all(self)
+
+    Note over R: iterate every adapter module;<br/>each try-imports its optional dep
+
+    R->>FAT: try import
+    FAT-->>R: stdlib only, OK
+    R->>SM: register_filesystem("fat", FATFilesystem)
+
+    R->>TSK: try import pytsk3
+    TSK-->>R: ImportError (optional extra missing)
+    Note over R: log.debug("tsk adapter skipped")
+
+    R->>APFS: try import apfs_reader
+    APFS-->>R: ImportError
+    Note over R: log.debug("apfs adapter skipped")
+
+    R-->>SM: done
+    SM-->>CTX: StorageManager ready<br/>filesystems() -> ["fat"]

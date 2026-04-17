@@ -1,0 +1,21 @@
+journey
+    title Forensic operator: NAND image to carved file
+    section Acquire
+      Plug reader / pull target image: 3: Operator
+      deepview memory acquire or remote ssh: 4: Operator, Deep View
+    section Wrap
+      deepview storage wrap-nand (ECC + FTL): 4: Operator, Deep View
+      Auto-detect geometry via probe: 5: Deep View
+    section Unlock
+      Scan memory for master keys: 5: Deep View
+      Try MasterKey candidates (cheap): 5: Deep View
+      Fall back to Passphrase via offload PBKDF2: 3: Operator, Deep View
+      ContainerUnlockedEvent emitted: 5: Deep View
+    section Explore
+      deepview storage list-filesystem: 5: Operator
+      Walk directory tree: 4: Operator
+    section Carve
+      deepview storage carve-deleted: 4: Operator, Deep View
+      Recover orphan inodes / slack: 4: Deep View
+    section Report
+      deepview report generate (HTML + STIX): 5: Operator, Deep View

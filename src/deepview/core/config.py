@@ -101,6 +101,47 @@ class DisassemblyConfig(BaseSettings):
     hopper_license_path: str = ""
     capstone_detail_mode: bool = True
 
+
+class StorageConfig(BaseSettings):
+    default_page_size: int = 4096
+    default_spare_size: int = 64
+    default_ecc: str = "bch8"  # bch8|hamming|rs|none
+    default_ftl: str = "badblock"  # badblock|mtd|ubi|jffs2|emmc_hints|ufs|none
+    default_spare_layout: str = "onfi"
+    prefer_native_filesystems: bool = True  # prefer pyfsXXX over pytsk3 when both available
+
+
+class ContainersConfig(BaseSettings):
+    allow_write: bool = False  # decrypted volumes are read-only by default
+    cache_sectors: int = 256
+    passphrase_attempts: int = 100  # max passphrases tried in auto_unlock
+    try_hidden: bool = False
+    pbkdf2_default_iterations: int = 1000
+    argon2_default_memory_kib: int = 65536
+    argon2_default_iterations: int = 3
+    argon2_default_parallelism: int = 4
+
+
+class OffloadConfig(BaseSettings):
+    default_backend: str = "process"  # process|thread|gpu-opencl|gpu-cuda
+    process_workers: int | None = None  # None = os.cpu_count()
+    thread_workers: int | None = None
+    gpu_enabled: bool = False  # explicit opt-in for GPU backends
+
+
+class RemoteEndpointConfig(BaseSettings):
+    host: str
+    transport: str  # ssh|tcp|udp|grpc|ipmi|amt|dma
+    port: int | None = None
+    username: str | None = None
+    identity_file: Path | None = None
+    password_env: str | None = None
+    known_hosts: Path | None = None
+    tls_ca: Path | None = None
+    require_tls: bool = True
+    extra: dict[str, str] = Field(default_factory=dict)
+
+
 class DeepViewConfig(BaseSettings):
     model_config = {"env_prefix": "DEEPVIEW_"}
 
@@ -126,6 +167,10 @@ class DeepViewConfig(BaseSettings):
     monitor: MonitorConfig = Field(default_factory=MonitorConfig)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     network_mangle: NetworkMangleConfig = Field(default_factory=NetworkMangleConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
+    containers: ContainersConfig = Field(default_factory=ContainersConfig)
+    offload: OffloadConfig = Field(default_factory=OffloadConfig)
+    remote_endpoints: list[RemoteEndpointConfig] = Field(default_factory=list)
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> DeepViewConfig:

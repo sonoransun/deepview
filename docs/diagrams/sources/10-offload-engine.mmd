@@ -1,0 +1,32 @@
+graph TB
+    J["OffloadJob<br/>(kind, payload, callable_ref)"]:::job
+    S["OffloadEngine.submit(job)"]:::engine
+    EBS["publish<br/>OffloadJobSubmittedEvent"]:::event
+
+    S --> EBS
+    S --> PICK{"_pick(backend)"}:::choice
+
+    PICK -->|default| PPB["ProcessPoolBackend"]:::backend
+    PICK -->|thread| THB["ThreadPoolBackend"]:::backend
+    PICK -->|gpu-opencl| GCL["OpenCLBackend"]:::backend
+    PICK -->|gpu-cuda| GCU["CUDABackend"]:::backend
+    PICK -->|remote| RWB["RemoteWorkerBackend"]:::backend
+
+    PPB --> DIS["_dispatch(callable_ref, payload)"]:::dispatch
+    THB --> DIS
+    GCL --> DIS
+    GCU --> DIS
+    RWB --> DIS
+
+    DIS --> RES["OffloadResult<br/>(ok, output, elapsed_s)"]:::result
+    RES --> EBC["publish<br/>OffloadJobCompletedEvent"]:::event
+    RES --> F["OffloadFuture<br/>returned to caller"]:::future
+
+    classDef job fill:#1e1e2e,stroke:#f9e2af,color:#cdd6f4
+    classDef engine fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
+    classDef event fill:#1e1e2e,stroke:#f38ba8,color:#cdd6f4
+    classDef choice fill:#1e1e2e,stroke:#fab387,color:#cdd6f4
+    classDef backend fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    classDef dispatch fill:#1e1e2e,stroke:#94e2d5,color:#cdd6f4
+    classDef result fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    classDef future fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4

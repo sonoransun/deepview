@@ -1,0 +1,56 @@
+classDiagram
+    class AnalysisContext {
+        +DeepViewConfig config
+        +str session_id
+        +LayerRegistry layers
+        +EventBus events
+        +PlatformInfo platform
+        +ArtifactStore artifacts
+        -PluginRegistry _plugin_registry
+        -OffloadEngine _offload_engine
+        -StorageManager _storage_manager
+        -UnlockOrchestrator _unlock_orchestrator
+        +plugins() PluginRegistry
+        +offload() OffloadEngine
+        +storage() StorageManager
+        +unlocker() UnlockOrchestrator
+        +from_config(path) AnalysisContext
+        +for_testing() AnalysisContext
+    }
+
+    class PluginRegistry {
+        +discover()
+        +get(name) type
+        +list_plugins(category) list
+        +instantiate(name, config) DeepViewPlugin
+    }
+
+    class OffloadEngine {
+        +register_backend(name, backend)
+        +submit(job, backend) OffloadFuture
+        +submit_many(jobs) AsyncIterator
+        +status() dict
+        +shutdown(wait)
+    }
+
+    class StorageManager {
+        +register_filesystem(name, cls)
+        +register_ftl(name, cls)
+        +register_ecc(name, cls)
+        +open_filesystem(layer, fs_type, offset) Filesystem
+        +wrap_nand(layer, geometry, ecc, ftl) DataLayer
+        +probe(layer) list
+    }
+
+    class UnlockOrchestrator {
+        +register(unlocker)
+        +available_unlockers() list
+        +auto_unlock(layer, passphrases, keyfiles, scan_keys, try_hidden) list
+    }
+
+    AnalysisContext "1" --> "0..1" PluginRegistry : lazy
+    AnalysisContext "1" --> "0..1" OffloadEngine : lazy
+    AnalysisContext "1" --> "0..1" StorageManager : lazy
+    AnalysisContext "1" --> "0..1" UnlockOrchestrator : lazy
+
+    note for AnalysisContext "Every @property constructs the subsystem\non first access and caches it for the rest\nof the session."

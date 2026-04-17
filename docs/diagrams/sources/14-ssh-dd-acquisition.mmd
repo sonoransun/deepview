@@ -1,0 +1,35 @@
+sequenceDiagram
+    autonumber
+    participant OP as Operator
+    participant CLI as deepview memory acquire remote
+    participant G as Authorization Gate
+    participant P as SSHDDProvider
+    participant SSH as paramiko.SSHClient
+    participant H as Remote Host (sudo dd)
+    participant EB as EventBus
+
+    OP->>CLI: --transport ssh --host target --confirm<br/>--authorization-statement "..."
+
+    CLI->>G: check --confirm + auth statement
+    alt missing
+        G-->>CLI: AuthorizationError
+        CLI-->>OP: abort
+    end
+
+    Note over CLI: 5s warning banner + countdown
+
+    CLI->>P: build_remote_provider("ssh", endpoint, ctx)
+    P->>EB: publish RemoteAcquisitionStartedEvent
+    P->>SSH: connect(host, identity_file, known_hosts)
+    SSH-->>P: authenticated channel
+
+    P->>H: exec "sudo dd if=/dev/mem bs=1M"
+    loop for each chunk
+        H-->>P: raw bytes
+        P->>P: write chunk to output file
+        P->>EB: publish RemoteAcquisitionProgressEvent<br/>(bytes_done, bytes_total, stage="stream")
+    end
+
+    P->>EB: publish RemoteAcquisitionCompletedEvent
+    P-->>CLI: AcquisitionResult(path, size, elapsed)
+    CLI-->>OP: success

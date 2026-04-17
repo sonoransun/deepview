@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 64 64"
+     role="img"
+     aria-labelledby="dv-icon-analyse-title dv-icon-analyse-desc"
+     fill="currentColor">
+  <title id="dv-icon-analyse-title">Analyse</title>
+  <desc id="dv-icon-analyse-desc">A magnifying glass over a small signal trace,
+  symbolising Deep View's analytical primitives: plugins, scanners, classifiers,
+  and the live inspect surface.</desc>
+  <style>svg { color: #cba6f7; }</style>
+
+  <!-- Baseline / trace being inspected -->
+  <polyline points="6,44 14,44 18,36 24,40 30,28 36,38 42,30 50,34 58,34"
+            fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+
+  <!-- Lens ring -->
+  <circle cx="26" cy="28" r="14" fill="none"
+          stroke="currentColor" stroke-width="3"/>
+
+  <!-- Reticle crosshair -->
+  <line x1="26" y1="18" x2="26" y2="38"
+        stroke="currentColor" stroke-width="1.2" opacity="0.8"/>
+  <line x1="16" y1="28" x2="36" y2="28"
+        stroke="currentColor" stroke-width="1.2" opacity="0.8"/>
+  <circle cx="26" cy="28" r="2" fill="currentColor"/>
+
+  <!-- Handle -->
+  <line x1="37" y1="39" x2="54" y2="56"
+        stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+</svg>

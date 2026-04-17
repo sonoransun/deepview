@@ -1,0 +1,27 @@
+stateDiagram-v2
+    [*] --> Submit
+    Submit: OffloadEngine.submit(job, backend="gpu-opencl")
+    Submit --> KernelBuild
+    KernelBuild: compile OpenCL / CUDA kernel
+
+    state KernelBuild <<choice>>
+    KernelBuild --> DeviceRun: build succeeded
+    KernelBuild --> CPUFallback: build failed / device missing
+
+    DeviceRun: enqueue + dispatch on GPU
+    DeviceRun --> DeviceResult
+    DeviceResult: OffloadResult(ok=True, backend="gpu-opencl")
+    DeviceResult --> [*]
+
+    CPUFallback: invoke deepview.offload.kdf:pbkdf2_sha256\non host (process pool)
+    CPUFallback --> CPUResult
+    CPUResult: OffloadResult(ok=True,\nbackend="process",\noutput includes fallback=True tag)
+    CPUResult --> [*]
+
+    note right of CPUFallback
+        Guarantees forward progress:
+        GPU backends never hard-fail.
+        Callers see OffloadJobCompletedEvent
+        with backend field reflecting
+        the actual executor.
+    end note

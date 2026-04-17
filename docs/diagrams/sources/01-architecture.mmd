@@ -1,0 +1,129 @@
+graph TB
+    CLI["CLI<br/>(Click + Rich)"]:::core
+    CTX["AnalysisContext"]:::core
+
+    subgraph Core["Core Framework"]
+        CTX
+        EB["EventBus<br/>(pub/sub)"]:::core
+        CFG["DeepViewConfig<br/>(pydantic)"]:::core
+        PR["PluginRegistry<br/>(3-tier discovery)"]:::core
+        PLT["PlatformInfo<br/>(detect)"]:::core
+    end
+
+    subgraph Memory["Memory Forensics"]
+        MM["MemoryManager"]:::analysis
+        ACQ["Acquisition<br/>LiME | AVML | WinPmem | OSXPmem"]:::source
+        FMT["Format parsers<br/>raw | LiME | ELF core | crashdump"]:::analysis
+        VOL["Volatility 3 / MemProcFS"]:::analysis
+    end
+
+    subgraph Storage["Storage Subsystem (new)"]
+        SM["StorageManager"]:::storage
+        FMTS["formats (raw, MTD, UBI)"]:::storage
+        ECC["ecc (BCH, Hamming, Reed-Solomon)"]:::storage
+        FTL["ftl (linearized, block map)"]:::storage
+        ENC["encodings (compression)"]:::storage
+        FS["filesystems (FAT, ext, APFS, tsk)"]:::storage
+        PART["partition (MBR / GPT)"]:::storage
+        CT["containers (LUKS / BitLocker / VeraCrypt / FileVault2)"]:::storage
+        AUTO["auto<br/>(orchestrates wrap+probe)"]:::storage
+    end
+
+    subgraph Offload["Offload Subsystem (new)"]
+        OE["OffloadEngine"]:::offload
+        THB["ThreadPoolBackend"]:::offload
+        PPB["ProcessPoolBackend<br/>(default)"]:::offload
+        GCL["OpenCLBackend"]:::offload
+        GCU["CUDABackend"]:::offload
+        RWB["RemoteWorkerBackend"]:::offload
+        KDF["KDF dispatch<br/>(pbkdf2_sha256 | argon2id)"]:::offload
+    end
+
+    subgraph Remote["Remote Acquisition (new)"]
+        REP["RemoteEndpoint"]:::remote
+        FAC["factory.build_remote_provider"]:::remote
+        SSH["SSH-DD"]:::remote
+        TCP["TCP / UDP / agent"]:::remote
+        DMA["DMA Thunderbolt / PCIe / FireWire"]:::remote
+        IPMI["IPMI / Intel AMT"]:::remote
+    end
+
+    subgraph Tracing["Tracing"]
+        TM["TraceManager"]:::instrument
+        PROV["eBPF | DTrace | ETW"]:::instrument
+    end
+
+    subgraph Instrument["Instrumentation"]
+        IM["Frida + binary reassembly"]:::instrument
+    end
+
+    subgraph VM["VM Introspection"]
+        VMM["QEMU | VBox | VMware | LibVMI"]:::analysis
+    end
+
+    subgraph Detection["Detection"]
+        DET["anti-forensics | injection | keys | anomaly | rootkit"]:::detect
+    end
+
+    subgraph Reporting["Reporting"]
+        RE["HTML / Markdown / JSON / STIX / ATT&CK"]:::report
+    end
+
+    CLI --> CTX
+    CTX --> EB
+    CTX --> CFG
+    CTX --> PR
+    CTX --> PLT
+    CTX --> MM
+    CTX --> SM
+    CTX --> OE
+    CTX --> TM
+    CTX --> IM
+    CTX --> VMM
+
+    MM --> ACQ
+    MM --> FMT
+    MM --> VOL
+
+    SM --> FMTS
+    SM --> ECC
+    SM --> FTL
+    SM --> ENC
+    SM --> FS
+    SM --> PART
+    SM --> CT
+    SM --> AUTO
+    AUTO -.orchestrates.-> ECC
+    AUTO -.orchestrates.-> FTL
+    AUTO -.orchestrates.-> PART
+    AUTO -.orchestrates.-> FS
+    CT -->|KDF work| OE
+
+    OE --> THB
+    OE --> PPB
+    OE --> GCL
+    OE --> GCU
+    OE --> RWB
+    OE --> KDF
+
+    FAC --> SSH
+    FAC --> TCP
+    FAC --> DMA
+    FAC --> IPMI
+    REP --> FAC
+    MM --> FAC
+
+    TM --> PROV
+    MM --> DET
+    SM --> DET
+    DET --> RE
+
+    classDef core fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
+    classDef analysis fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    classDef source fill:#1e1e2e,stroke:#fab387,color:#cdd6f4
+    classDef storage fill:#1e1e2e,stroke:#f9e2af,color:#cdd6f4
+    classDef offload fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    classDef remote fill:#1e1e2e,stroke:#f38ba8,color:#cdd6f4
+    classDef instrument fill:#1e1e2e,stroke:#94e2d5,color:#cdd6f4
+    classDef detect fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
+    classDef report fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4

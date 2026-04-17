@@ -117,6 +117,27 @@ class MemoryManager:
         if magic[:4] == b"PAGE" or magic[:8] == b"PAGEDU64":
             return DumpFormat.CRASHDUMP
 
+        # Windows minidump
+        if magic[:4] == b"MDMP":
+            return DumpFormat.MINIDUMP_FULL
+
+        # Windows hibernation file
+        if magic[:4] in (b"hibr", b"wake", b"HIBR", b"WAKE"):
+            return DumpFormat.HIBERFIL
+
+        # VirtualBox saved-state ("SSM" prefix)
+        if magic[:3] == b"SSM":
+            return DumpFormat.VIRTUALBOX_SAV
+
+        # Extension-based fallback for formats without reliable magic.
+        suffix = path.suffix.lower()
+        if suffix == ".vmem":
+            return DumpFormat.VMWARE_VMEM
+        if suffix == ".vmrs":
+            return DumpFormat.HYPERV_VMRS
+        if suffix in (".sav", ".vbox-sav"):
+            return DumpFormat.VIRTUALBOX_SAV
+
         return DumpFormat.RAW
 
     def open_layer(self, path: Path, fmt: DumpFormat | None = None, name: str = "") -> DataLayer:
@@ -138,6 +159,36 @@ class MemoryManager:
         elif fmt == DumpFormat.CRASHDUMP:
             from deepview.memory.formats.crashdump import CrashDumpLayer
             return CrashDumpLayer(path, name)
+        elif fmt == DumpFormat.HIBERFIL:
+            from deepview.memory.formats.hibernation import HibernationLayer
+            return HibernationLayer(path, name)
+        elif fmt == DumpFormat.MINIDUMP_FULL:
+            from deepview.storage.formats.minidump_full import MinidumpFullLayer
+            return MinidumpFullLayer(path, name)
+        elif fmt == DumpFormat.VMWARE_VMEM:
+            from deepview.storage.formats.vmware_vmem import VMwareVMEMLayer
+            return VMwareVMEMLayer(path, name=name)
+        elif fmt == DumpFormat.VIRTUALBOX_SAV:
+            from deepview.storage.formats.virtualbox_sav import VirtualBoxSavLayer
+            return VirtualBoxSavLayer(path, name)
+        elif fmt == DumpFormat.HYPERV_VMRS:
+            from deepview.storage.formats.hyperv_vmrs import HyperVVMRSLayer
+            return HyperVVMRSLayer(path, name=name)
+        elif fmt == DumpFormat.NAND_RAW:
+            from deepview.storage.formats.nand_raw import RawNANDLayer
+            return RawNANDLayer(path, geometry=None, name=name)
+        elif fmt == DumpFormat.EMMC_RAW:
+            from deepview.storage.formats.emmc_raw import EMMCRawLayer
+            return EMMCRawLayer(path, name)
+        elif fmt == DumpFormat.SPI_FLASH:
+            from deepview.storage.formats.spi_flash import SPIFlashLayer
+            return SPIFlashLayer(path, name)
+        elif fmt == DumpFormat.JTAG_RAM:
+            from deepview.storage.formats.jtag_ram import JTAGRAMLayer
+            return JTAGRAMLayer(path, name)
+        elif fmt == DumpFormat.GPU_VRAM:
+            from deepview.storage.formats.gpu_vram import GPUVRAMLayer
+            return GPUVRAMLayer(path, name=name)
         else:
             raise FormatError(f"Unsupported format: {fmt}")
 

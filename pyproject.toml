@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepview"
-version = "0.1.0"
+version = "0.2.0"
 description = "Cross-platform computer system forensics and runtime analysis toolkit"
 requires-python = ">=3.10"
 dependencies = [
@@ -65,6 +65,50 @@ disassembly = [
     "capstone>=5.0",
     "pyhidra>=1.0",
 ]
+storage = [
+    "pytsk3>=20231007",
+    "pyfsapfs>=20231205",
+    "pyfsntfs>=20231028",
+    "pyfsxfs>=20220829",
+    "pyfsbtrfs>=20220704",
+    "pyfsf2fs>=20220214",
+    "pyfshfs>=20231125",
+    "pyfsext>=20231023",
+]
+compression = [
+    "zstandard>=0.22",
+    "lz4>=4.3",
+    "python-lzo>=1.15",
+]
+ecc = [
+    "reedsolo>=1.7",
+    "galois>=0.3",
+]
+offload_gpu = [
+    "pyopencl>=2022.1",
+    "pycuda>=2022.1",
+]
+containers = [
+    "cryptography>=41.0",
+    "argon2-cffi>=23.1",
+    "pycryptsetup>=0.2; platform_system=='Linux'",
+    "libbde-python>=20230319",
+    "libfvde-python>=20230319",
+]
+remote_acquisition = [
+    "paramiko>=3.3",
+    "grpcio>=1.58",
+    "grpcio-tools>=1.58",
+    "python-ipmi>=0.5",
+    "forensic1394>=0.3",
+]
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
+    "mkdocs-mermaid2-plugin>=1.1",
+    "pymdown-extensions>=10.7",
+    "mkdocs-asciinema-player-plugin>=0.0.4",
+]
 all = [
     "deepview[memory]",
     "deepview[tracing]",
@@ -79,6 +123,13 @@ all = [
     "deepview[sigma]",
     "deepview[sidechannel]",
     "deepview[disassembly]",
+    "deepview[storage]",
+    "deepview[compression]",
+    "deepview[ecc]",
+    "deepview[offload_gpu]",
+    "deepview[containers]",
+    "deepview[remote_acquisition]",
+    "deepview[docs]",
 ]
 dev = [
     "pytest>=7.0",

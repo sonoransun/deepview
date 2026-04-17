@@ -30,6 +30,11 @@ class DumpFormat(str, enum.Enum):
     JTAG_RAM = "jtag_ram"
     SPI_FLASH = "spi_flash"
     GPU_VRAM = "gpu_vram"
+    HIBERFIL = "hiberfil"
+    MINIDUMP_FULL = "minidump_full"
+    VMWARE_VMEM = "vmware_vmem"
+    VIRTUALBOX_SAV = "virtualbox_sav"
+    HYPERV_VMRS = "hyperv_vmrs"
 
 
 class ProbeType(str, enum.Enum):

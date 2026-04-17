@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    participant OP as Operator
+    participant CLI as deepview memory acquire remote<br/>--transport dma-tb
+    participant G as Safety Gates
+    participant P as ThunderboltDMAProvider
+    participant LC as leechcore (PCILeech)
+    participant EB as EventBus
+
+    OP->>CLI: --enable-dma --confirm<br/>--authorization-statement "..."
+    CLI->>G: confirm present?
+    CLI->>G: --enable-dma present?
+    CLI->>G: euid == 0 (root)?
+    alt any check fails
+        G-->>CLI: AuthorizationError
+        CLI-->>OP: abort
+    end
+
+    CLI->>P: build_remote_provider("dma-tb", endpoint, ctx)
+    P->>EB: publish RemoteAcquisitionProgressEvent<br/>stage="iommu-check"
+    P->>P: probe IOMMU status (VT-d / AMD-Vi)
+    alt IOMMU active
+        Note over P: log warning: DMA likely blocked;<br/>proceed anyway
+    end
+
+    P->>LC: init device, query memory map
+    loop chunked read 0..max_bytes
+        P->>LC: read(addr, chunk_size)
+        LC-->>P: bytes
+        P->>P: stream to output
+        P->>EB: publish RemoteAcquisitionProgressEvent<br/>stage="stream"
+    end
+
+    P->>EB: publish RemoteAcquisitionCompletedEvent
+    P-->>CLI: AcquisitionResult
+    CLI-->>OP: success

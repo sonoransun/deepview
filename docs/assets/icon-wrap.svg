@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 64 64"
+     role="img"
+     aria-labelledby="dv-icon-wrap-title dv-icon-wrap-desc"
+     fill="currentColor">
+  <title id="dv-icon-wrap-title">Wrap</title>
+  <desc id="dv-icon-wrap-desc">Two nested layers representing the wrap stage
+  (ECC correction, flash translation, and decryption) that sits between raw
+  acquisition and analytical primitives.</desc>
+  <style>svg { color: #cba6f7; }</style>
+
+  <!-- Outer wrap layer (solid, slightly rotated square) -->
+  <rect x="10" y="10" width="44" height="44" rx="6" ry="6"
+        fill="none" stroke="currentColor" stroke-width="2.5"/>
+
+  <!-- Middle wrap layer -->
+  <rect x="17" y="17" width="30" height="30" rx="4" ry="4"
+        fill="none" stroke="currentColor" stroke-width="2"
+        stroke-dasharray="3 2" opacity="0.75"/>
+
+  <!-- Inner core (the decrypted, corrected byte stream) -->
+  <rect x="25" y="25" width="14" height="14" rx="2" ry="2"
+        fill="currentColor" opacity="0.9"/>
+
+  <!-- Connecting ticks (suggesting transformation between layers) -->
+  <line x1="32" y1="4" x2="32" y2="10"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="32" y1="54" x2="32" y2="60"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="4" y1="32" x2="10" y2="32"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="54" y1="32" x2="60" y2="32"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>

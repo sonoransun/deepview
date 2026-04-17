@@ -1,0 +1,49 @@
+sequenceDiagram
+    autonumber
+    participant CLI as CLI (unlock)
+    participant UO as UnlockOrchestrator
+    participant U as Unlocker (LUKS)
+    participant KS as EncryptionKeyScanner
+    participant OE as OffloadEngine
+    participant EB as EventBus
+
+    CLI->>UO: auto_unlock(layer, passphrases, keyfiles,<br/>scan_keys=True, try_hidden=False)
+
+    loop for each registered Unlocker
+        UO->>U: detect(layer)
+        alt no header
+            U-->>UO: None
+        else header found
+            U-->>UO: ContainerHeader
+        end
+    end
+
+    opt scan_keys=True
+        UO->>KS: scan_all(registered layers)
+        KS-->>UO: [MasterKey(...), ...]
+    end
+
+    Note over UO: order: master_keys -> keyfiles -> passphrases
+
+    loop ordered candidates
+        UO->>EB: publish ContainerUnlockStartedEvent
+        alt source = MasterKey
+            UO->>U: unlock(layer, header, MasterKey)
+        else source = Passphrase
+            UO->>OE: submit(kdf job: pbkdf2_sha256 | argon2id)
+            OE-->>UO: OffloadFuture -> derived key
+            UO->>U: unlock(layer, header, derived key)
+        end
+        alt success
+            U-->>UO: DecryptedVolumeLayer
+            UO->>EB: publish ContainerUnlockedEvent
+        else fail
+            U-->>UO: exception -> try next
+        end
+    end
+
+    opt all candidates exhausted
+        UO->>EB: publish ContainerUnlockFailedEvent
+    end
+
+    UO-->>CLI: list[DecryptedVolumeLayer]

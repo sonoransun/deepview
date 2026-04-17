@@ -1,0 +1,21 @@
+graph TB
+    D["pydantic defaults<br/>(DeepViewConfig field defaults)"]:::layer1
+    T["~/.deepview/config.toml<br/>(validated: no symlinks,<br/>size-limited, TOML parse)"]:::layer2
+    E["DEEPVIEW_*__ env vars<br/>(nested keys via __ delimiter)"]:::layer3
+    C["CLI flag overrides<br/>(--log-level, --config, ...)"]:::layer4
+    F["final DeepViewConfig instance<br/>(attached to AnalysisContext.config)"]:::final
+
+    D -->|base| T
+    T -->|override| E
+    E -->|override| C
+    C -->|materialize| F
+
+    VAL["_validate_config_file<br/>- rejects symlinks<br/>- rejects oversized files<br/>- rejects unreadable paths"]:::guard
+    T -.gates.- VAL
+
+    classDef layer1 fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    classDef layer2 fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    classDef layer3 fill:#1e1e2e,stroke:#f9e2af,color:#cdd6f4
+    classDef layer4 fill:#1e1e2e,stroke:#fab387,color:#cdd6f4
+    classDef final fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
+    classDef guard fill:#1e1e2e,stroke:#f38ba8,color:#cdd6f4

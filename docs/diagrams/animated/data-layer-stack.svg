@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 260" role="img"
+     aria-labelledby="dls-title dls-desc">
+  <title id="dls-title">Deep View data-layer composition stack</title>
+  <desc id="dls-desc">
+    Five stacked rectangles labelled RawNAND, ECC, FTL, Partition, and Filesystem
+    fade in left-to-right with a 1.5 second stagger over an 8 second loop.
+    During the second half of the loop an arrow travels right-to-left through
+    the stack illustrating a read being forwarded down the layers.
+    The diagram is laid out as a readable flat stack even when CSS animation
+    is not supported by the renderer.
+  </desc>
+
+  <defs>
+    <style><![CDATA[
+      .bg      { fill: #1e1e2e; }
+      .lbl     { fill: #cdd6f4; font-family: 'Fira Sans', 'Segoe UI', sans-serif; font-size: 18px; font-weight: 600; }
+      .sub     { fill: #a6adc8; font-family: 'Fira Mono', monospace; font-size: 12px; }
+      .caption { fill: #cdd6f4; font-family: 'Fira Sans', sans-serif; font-size: 14px; font-weight: 500; }
+
+      /* Each layer rectangle starts invisible then fades in on a staggered timeline. */
+      .layer {
+        opacity: 0;
+        transform-origin: left center;
+        animation: fadeIn 8s infinite ease-in-out;
+      }
+      .l1 { animation-delay: 0.0s; fill: #cba6f7; }
+      .l2 { animation-delay: 1.5s; fill: #94e2d5; }
+      .l3 { animation-delay: 3.0s; fill: #f9e2af; }
+      .l4 { animation-delay: 4.5s; fill: #fab387; }
+      .l5 { animation-delay: 6.0s; fill: #a6e3a1; }
+
+      @keyframes fadeIn {
+         0% { opacity: 0; }
+         8% { opacity: 1; }
+        95% { opacity: 1; }
+       100% { opacity: 0; }
+      }
+
+      /* The traversing read-arrow activates in the second half of the loop. */
+      .arrow {
+        opacity: 0;
+        animation: travel 8s infinite linear;
+      }
+      @keyframes travel {
+         0%  { opacity: 0; transform: translateX(0px); }
+        50%  { opacity: 0; transform: translateX(0px); }
+        55%  { opacity: 1; transform: translateX(0px); }
+        95%  { opacity: 1; transform: translateX(-640px); }
+       100%  { opacity: 0; transform: translateX(-640px); }
+      }
+
+      /* Static fallback: when CSS animations are stripped, the :root
+         rule re-enables full opacity so every rectangle is visible.
+         GitHub's <img> wrap of SVG disables animation but keeps
+         CSS — the animation-name still applies but no frames run,
+         so we belt-and-braces with opacity: 1 at the element level. */
+    ]]></style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="800" height="260"/>
+
+  <text class="caption" x="20" y="30">Deep View data-layer composition (reads forwarded down-stack)</text>
+
+  <!-- Five layer rectangles, drawn in source order so the z-index matches
+       the mental model: filesystem outermost, RawNAND innermost. -->
+  <g transform="translate(20,60)">
+    <g>
+      <rect class="layer l1" x="0"   y="0" width="120" height="150" rx="6" ry="6" opacity="1"/>
+      <text class="lbl" x="60"  y="82"  text-anchor="middle">RawNAND</text>
+      <text class="sub" x="60"  y="105" text-anchor="middle">bytes on disk</text>
+    </g>
+    <g>
+      <rect class="layer l2" x="150" y="0" width="120" height="150" rx="6" ry="6" opacity="1"/>
+      <text class="lbl" x="210" y="82"  text-anchor="middle">ECC</text>
+      <text class="sub" x="210" y="105" text-anchor="middle">Hamming/BCH/RS</text>
+    </g>
+    <g>
+      <rect class="layer l3" x="300" y="0" width="120" height="150" rx="6" ry="6" opacity="1"/>
+      <text class="lbl" x="360" y="82"  text-anchor="middle">FTL</text>
+      <text class="sub" x="360" y="105" text-anchor="middle">UBI / JFFS2</text>
+    </g>
+    <g>
+      <rect class="layer l4" x="450" y="0" width="120" height="150" rx="6" ry="6" opacity="1"/>
+      <text class="lbl" x="510" y="82"  text-anchor="middle">Partition</text>
+      <text class="sub" x="510" y="105" text-anchor="middle">MBR / GPT</text>
+    </g>
+    <g>
+      <rect class="layer l5" x="600" y="0" width="120" height="150" rx="6" ry="6" opacity="1"/>
+      <text class="lbl" x="660" y="82"  text-anchor="middle">Filesystem</text>
+      <text class="sub" x="660" y="105" text-anchor="middle">FAT / ext / NTFS</text>
+    </g>
+
+    <!-- Static arrows on top of the stack: show composition direction. -->
+    <g stroke="#cdd6f4" stroke-width="2" fill="none">
+      <line x1="120" y1="75" x2="150" y2="75"/>
+      <line x1="270" y1="75" x2="300" y2="75"/>
+      <line x1="420" y1="75" x2="450" y2="75"/>
+      <line x1="570" y1="75" x2="600" y2="75"/>
+    </g>
+    <g fill="#cdd6f4">
+      <polygon points="150,75 142,70 142,80"/>
+      <polygon points="300,75 292,70 292,80"/>
+      <polygon points="450,75 442,70 442,80"/>
+      <polygon points="600,75 592,70 592,80"/>
+    </g>
+
+    <!-- Animated read-arrow — starts at the right edge, travels left. -->
+    <g class="arrow">
+      <circle cx="700" cy="180" r="7" fill="#f38ba8"/>
+      <text class="sub" x="720" y="184" fill="#f38ba8">read()</text>
+    </g>
+  </g>
+</svg>

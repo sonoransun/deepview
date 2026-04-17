@@ -1,0 +1,119 @@
+site_name: Deep View
+site_description: Cross-platform forensics and runtime-analysis toolkit
+site_url: https://example.invalid/deepview/
+repo_url: https://github.com/example/deepview
+repo_name: example/deepview
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/magnify-scan
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+plugins:
+  - search
+  - mermaid2:
+      version: 10.9.1
+  - asciinema-player:
+      autoPlay: true
+      loop: true
+      preload: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/example/deepview
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Overview:
+      - Architecture: overview/architecture.md
+      - Data-layer composition: overview/data-layer-composition.md
+      - Plugin discovery: overview/plugin-discovery.md
+  - Architecture:
+      - Storage stack: architecture/storage.md
+      - Offload engine: architecture/offload.md
+      - Container unlock: architecture/containers.md
+      - Remote acquisition: architecture/remote-acquisition.md
+      - Tracing & classification: architecture/tracing-and-classification.md
+  - Guides:
+      - Storage image walkthrough: guides/storage-image-walkthrough.md
+      - Unlock a LUKS volume: guides/unlock-luks-volume.md
+      - Unlock a VeraCrypt hidden volume: guides/unlock-veracrypt-hidden.md
+      - Remote acquire over SSH: guides/remote-acquire-ssh.md
+      - Remote acquire over DMA: guides/remote-acquire-dma.md
+      - Offload a PBKDF2 job: guides/offload-pbkdf2.md
+      - Extending Deep View: guides/extending-deepview.md
+  - Reference:
+      - CLI: reference/cli.md
+      - Plugins: reference/plugins.md
+      - Interfaces: reference/interfaces.md
+      - Events: reference/events.md
+      - Config: reference/config.md
+      - Optional extras: reference/extras.md
+  - Changelog: ../CHANGELOG.md
+  - Contributing: ../CONTRIBUTING.md

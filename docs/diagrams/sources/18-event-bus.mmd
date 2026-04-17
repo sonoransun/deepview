@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+    participant Pub as Publisher
+    participant EB as EventBus
+    participant H1 as exact-type handler
+    participant H2 as parent-class handler
+    participant AH as async handler
+
+    Note over Pub,EB: Synchronous path: publish()
+    Pub->>EB: publish(ContainerUnlockedEvent(...))
+    EB->>EB: lock + snapshot handlers
+    Note over EB: exact = _handlers[type(event)]<br/>parent = handlers where<br/>isinstance(event, registered_type)
+
+    loop exact handlers
+        EB->>H1: handler(event)
+        H1-->>EB: return
+    end
+    loop parent handlers
+        EB->>H2: handler(event)
+        H2-->>EB: return
+    end
+    EB-->>Pub: all dispatched
+
+    Note over Pub,EB: Async path: publish_async()
+    Pub->>EB: await publish_async(event)
+    EB->>EB: publish(event)  (sync pass first)
+    EB->>EB: snapshot async handlers
+    loop async handlers
+        EB->>AH: await handler(event)
+        AH-->>EB: return
+    end
+    EB-->>Pub: complete

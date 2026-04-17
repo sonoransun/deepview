@@ -1,0 +1,20 @@
+stateDiagram-v2
+    [*] --> ReceiveLBA
+    ReceiveLBA: receive logical LBA
+    ReceiveLBA --> Translate: FTLTranslator.translate(lba)
+    Translate: map LBA -> (block, page)
+    Translate --> BadBlockCheck
+
+    state BadBlockCheck <<choice>>
+    BadBlockCheck --> Remap: block marked bad
+    BadBlockCheck --> FetchPage: block OK
+
+    Remap: consult remap table
+    Remap --> FetchPage: substitute physical (block', page)
+
+    FetchPage: backing.read(page_addr)
+    FetchPage --> ECCDecode
+    ECCDecode: ECCDataLayer corrects bit errors
+    ECCDecode --> ReturnBytes
+    ReturnBytes: corrected bytes to caller
+    ReturnBytes --> [*]

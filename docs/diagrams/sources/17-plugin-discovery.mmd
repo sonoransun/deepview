@@ -1,0 +1,42 @@
+sequenceDiagram
+    autonumber
+    participant IMP as importlib
+    participant BI as deepview.plugins.builtin
+    participant DEC as "@register_plugin"
+    participant G as _REGISTERED_PLUGINS (module global)
+    participant CTX as AnalysisContext
+    participant PR as PluginRegistry
+
+    Note over IMP,BI: Tier 1 (import-time side effect)
+    IMP->>BI: import deepview.plugins.builtin
+    BI->>DEC: class definitions apply decorator
+    DEC->>G: _REGISTERED_PLUGINS[name] = cls
+
+    Note over CTX,PR: First access to context.plugins
+    CTX->>PR: PluginRegistry(self) via @property
+    PR->>PR: discover() - once
+
+    PR->>BI: import deepview.plugins.builtin
+    PR->>G: get_registered_plugins()
+    G-->>PR: {name: cls, ...}
+
+    Note over PR: Tier 2 - entry points
+    PR->>PR: importlib.metadata.entry_points(group="deepview.plugins")
+    loop each entry point
+        PR->>PR: ep.load() -> cls
+        alt name already present
+            PR->>PR: log.warning("duplicate_plugin_name") - skip
+        else new
+            PR->>PR: _plugins[name] = cls
+        end
+    end
+
+    Note over PR: Tier 3 - directory scan
+    PR->>PR: for path in config.plugin_paths + config_dir/plugins
+    alt symlink
+        PR->>PR: refuse, continue
+    else real dir
+        PR->>PR: load every *.py (skip underscore prefixed)
+    end
+
+    PR-->>CTX: ready

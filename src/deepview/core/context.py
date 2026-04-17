@@ -7,7 +7,10 @@ from deepview.core.events import EventBus
 from deepview.core.platform import PlatformInfo
 
 if TYPE_CHECKING:
+    from deepview.offload.engine import OffloadEngine
     from deepview.plugins.registry import PluginRegistry
+    from deepview.storage.containers.unlock import UnlockOrchestrator
+    from deepview.storage.manager import StorageManager
 
 
 class LayerRegistry:
@@ -66,6 +69,9 @@ class AnalysisContext:
         self.platform = PlatformInfo.detect()
         self.artifacts = ArtifactStore()
         self._plugin_registry: PluginRegistry | None = None
+        self._offload_engine: OffloadEngine | None = None
+        self._storage_manager: StorageManager | None = None
+        self._unlock_orchestrator: UnlockOrchestrator | None = None
 
     @property
     def plugins(self) -> PluginRegistry:
@@ -73,6 +79,27 @@ class AnalysisContext:
             from deepview.plugins.registry import PluginRegistry
             self._plugin_registry = PluginRegistry(self)
         return self._plugin_registry
+
+    @property
+    def offload(self) -> OffloadEngine:
+        if self._offload_engine is None:
+            from deepview.offload.engine import OffloadEngine
+            self._offload_engine = OffloadEngine(self)
+        return self._offload_engine
+
+    @property
+    def storage(self) -> StorageManager:
+        if self._storage_manager is None:
+            from deepview.storage.manager import StorageManager
+            self._storage_manager = StorageManager(self)
+        return self._storage_manager
+
+    @property
+    def unlocker(self) -> UnlockOrchestrator:
+        if self._unlock_orchestrator is None:
+            from deepview.storage.containers.unlock import UnlockOrchestrator
+            self._unlock_orchestrator = UnlockOrchestrator(self)
+        return self._unlock_orchestrator
 
     @classmethod
     def from_config(cls, config_path=None) -> AnalysisContext:

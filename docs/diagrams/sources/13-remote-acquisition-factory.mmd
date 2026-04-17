@@ -1,0 +1,38 @@
+graph LR
+    T["transport name<br/>ssh | tcp | udp | agent | lime |<br/>dma-tb | dma-pcie | dma-fw | ipmi | amt | grpc"]:::input
+    EP["RemoteEndpoint<br/>(host, port, auth indirection)"]:::input
+    CTX["AnalysisContext"]:::input
+
+    F["factory.build_remote_provider(transport, endpoint, context)"]:::factory
+
+    SSH["SSHDDProvider"]:::prov
+    TCP["TCPStreamProvider"]:::prov
+    UDP["UDPStreamProvider"]:::prov
+    AG["NetworkAgentProvider"]:::prov
+    LR["LiMERemoteProvider"]:::prov
+    DT["ThunderboltDMAProvider"]:::prov
+    DP["PCIeDMAProvider"]:::prov
+    DF["FireWireDMAProvider"]:::prov
+    IP["IPMIProvider"]:::prov
+    AM["IntelAMTProvider"]:::prov
+
+    T --> F
+    EP --> F
+    CTX --> F
+
+    F -->|ssh| SSH
+    F -->|tcp| TCP
+    F -->|udp| UDP
+    F -->|agent| AG
+    F -->|lime| LR
+    F -->|"dma-tb / thunderbolt"| DT
+    F -->|"dma-pcie / pcie"| DP
+    F -->|"dma-fw / firewire"| DF
+    F -->|ipmi| IP
+    F -->|amt| AM
+    F -.->|unknown| ERR["ValueError"]:::err
+
+    classDef input fill:#1e1e2e,stroke:#f9e2af,color:#cdd6f4
+    classDef factory fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
+    classDef prov fill:#1e1e2e,stroke:#a6e3a1,color:#cdd6f4
+    classDef err fill:#1e1e2e,stroke:#f38ba8,color:#cdd6f4

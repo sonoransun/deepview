@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 220" role="img"
+     aria-labelledby="ebf-title ebf-desc">
+  <title id="ebf-title">ECC bit-flip-and-correct demonstration</title>
+  <desc id="ebf-desc">
+    A row of eight bits represented as colored squares. On a six-second loop:
+    one bit (the fourth) briefly flips from green (valid) to red (error);
+    an "ECC" badge appears above the row and pulses while the decoder runs;
+    the flipped bit then fades back to green as the correction is applied.
+    The final two seconds of the loop show the row at rest before starting
+    over. Statically (without animation) the diagram reads as eight green
+    bits with a dimmed ECC badge, which is the resting state.
+  </desc>
+
+  <defs>
+    <style><![CDATA[
+      .bg     { fill: #1e1e2e; }
+      .lbl    { fill: #cdd6f4; font-family: 'Fira Sans', 'Segoe UI', sans-serif; font-size: 16px; font-weight: 600; }
+      .sub    { fill: #a6adc8; font-family: 'Fira Mono', monospace; font-size: 12px; }
+      .bit    { font-family: 'Fira Mono', monospace; font-size: 20px; fill: #1e1e2e; font-weight: 700; }
+
+      /* The fourth bit is the one that flips. */
+      .flip-bit {
+        fill: #a6e3a1; /* green at rest */
+        animation: bitFlip 6s infinite ease-in-out;
+      }
+      @keyframes bitFlip {
+         0%   { fill: #a6e3a1; }
+        16%  { fill: #a6e3a1; } /* 0-1s: rest */
+        18%  { fill: #f38ba8; } /* 1-2s: flipped red */
+        50%  { fill: #f38ba8; } /* 2-3s: still red while ECC runs */
+        58%  { fill: #fab387; } /* 3-3.5s: transitioning */
+        66%  { fill: #a6e3a1; } /* 4s: corrected */
+       100%  { fill: #a6e3a1; } /* 4-6s: rest */
+      }
+
+      /* The ECC badge appears (opacity) + pulses (scale via stroke-width). */
+      .ecc-badge {
+        opacity: 0;
+        transform-origin: 280px 50px;
+        animation: eccAppear 6s infinite ease-in-out;
+      }
+      @keyframes eccAppear {
+         0%   { opacity: 0; }
+        33%  { opacity: 0; }   /* 0-2s: hidden */
+        38%  { opacity: 1; }   /* 2s: appear */
+        50%  { opacity: 0.6; }
+        58%  { opacity: 1; }   /* pulse */
+        66%  { opacity: 0; }   /* 4s: fade out after correction */
+       100%  { opacity: 0; }
+      }
+
+      .ecc-pulse-ring {
+        fill: none;
+        stroke: #f9e2af;
+        stroke-width: 2;
+        opacity: 0;
+        transform-origin: 280px 50px;
+        animation: eccRing 6s infinite ease-out;
+      }
+      @keyframes eccRing {
+         0%   { opacity: 0; transform: scale(0.7); }
+        33%  { opacity: 0; transform: scale(0.7); }
+        38%  { opacity: 1; transform: scale(0.9); }
+        50%  { opacity: 0; transform: scale(1.6); }
+       100%  { opacity: 0; transform: scale(1.6); }
+      }
+    ]]></style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="560" height="220"/>
+
+  <!-- Label -->
+  <text class="lbl" x="20" y="30">Hamming ECC: detect + correct a single-bit flip</text>
+
+  <!-- ECC badge at top (appears during decode). -->
+  <g class="ecc-badge">
+    <circle cx="280" cy="50" r="22" fill="#45475a" stroke="#f9e2af" stroke-width="2"/>
+    <text x="280" y="56" text-anchor="middle" font-family="'Fira Sans',sans-serif"
+          font-size="14" font-weight="700" fill="#f9e2af">ECC</text>
+  </g>
+  <circle class="ecc-pulse-ring" cx="280" cy="50" r="22"/>
+
+  <!-- Row of 8 bits, left to right. The 4th (index 3) is the one that flips. -->
+  <g transform="translate(60,100)">
+    <!-- bits 0..7 -->
+    <rect x="0"    y="0" width="40" height="60" rx="4" ry="4" fill="#a6e3a1"/>
+    <text class="bit" x="20"  y="40" text-anchor="middle">0</text>
+
+    <rect x="50"   y="0" width="40" height="60" rx="4" ry="4" fill="#a6e3a1"/>
+    <text class="bit" x="70"  y="40" text-anchor="middle">1</text>
+
+    <rect x="100"  y="0" width="40" height="60" rx="4" ry="4" fill="#a6e3a1"/>
+    <text class="bit" x="120" y="40" text-anchor="middle">1</text>
+
+    <!-- index 3: the flipping bit -->
+    <rect class="flip-bit" x="150" y="0" width="40" height="60" rx="4" ry="4"/>
+    <text class="bit" x="170" y="40" text-anchor="middle">0</text>
+
+    <rect x="200"  y="0" width="40" height="60" rx="4" ry="4" fill="#a6e3a1"/>
+    <text class="bit" x="220" y="40" text-anchor="middle">1</text>
+
+    <rect x="250"  y="0" width="40" height="60" rx="4" ry="4" fill="#a6e3a1"/>
+    <text class="bit" x="270" y="40" text-anchor="middle">0</text>
+
+    <rect x="300"  y="0" width="40" height="60" rx="4" ry="4" fill="#a6e3a1"/>
+    <text class="bit" x="320" y="40" text-anchor="middle">1</text>
+
+    <rect x="350"  y="0" width="40" height="60" rx="4" ry="4" fill="#a6e3a1"/>
+    <text class="bit" x="370" y="40" text-anchor="middle">1</text>
+  </g>
+
+  <!-- Indicator strip below the bits: pointer to flipped bit -->
+  <g transform="translate(60,170)">
+    <text class="sub" x="0"   y="0">bit 0</text>
+    <text class="sub" x="170" y="0" fill="#f38ba8">flipped</text>
+    <text class="sub" x="350" y="0">bit 7</text>
+  </g>
+
+  <!-- Caption at bottom -->
+  <text class="sub" x="20" y="205">
+    cycle: rest → error detected → ECC decode → corrected
+  </text>
+</svg>

@@ -1,0 +1,29 @@
+stateDiagram-v2
+    [*] --> ProbeStandard
+    ProbeStandard: detect @ offset 0
+    ProbeStandard --> StandardOK: header decrypts
+    ProbeStandard --> StandardFail: no valid header
+
+    StandardOK: outer (standard) volume mounted
+    StandardOK --> MaybeHidden
+
+    state MaybeHidden <<choice>>
+    MaybeHidden --> ProbeTrailingModern: try_hidden=True
+    MaybeHidden --> [*]: try_hidden=False
+
+    ProbeTrailingModern: detect @ (vol_size - 65536)
+    ProbeTrailingModern --> HiddenModernOK: modern VeraCrypt header
+    ProbeTrailingModern --> ProbeTrailingLegacy: no modern header
+
+    ProbeTrailingLegacy: detect @ (vol_size - 131072)
+    ProbeTrailingLegacy --> HiddenLegacyOK: legacy TrueCrypt header
+    ProbeTrailingLegacy --> NoHidden: no header found
+
+    HiddenModernOK: hidden volume unlocked (modern)
+    HiddenLegacyOK: hidden volume unlocked (legacy)
+    NoHidden: only outer volume is present
+
+    StandardFail --> [*]: abort
+    HiddenModernOK --> [*]
+    HiddenLegacyOK --> [*]
+    NoHidden --> [*]

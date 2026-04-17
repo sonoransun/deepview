@@ -1,0 +1,43 @@
+stateDiagram-v2
+    [*] --> Invocation
+    Invocation: CLI invocation
+
+    Invocation --> CheckConfirm
+    CheckConfirm: --confirm present?
+
+    state CheckConfirm <<choice>>
+    CheckConfirm --> Abort: no
+    CheckConfirm --> CheckAuthStmt: yes
+
+    CheckAuthStmt: --authorization-statement<br/>present + non-empty?
+
+    state CheckAuthStmt <<choice>>
+    CheckAuthStmt --> Abort: no
+    CheckAuthStmt --> CheckDMA: yes
+
+    CheckDMA: DMA transport?
+
+    state CheckDMA <<choice>>
+    CheckDMA --> CheckDMAFlag: yes
+    CheckDMA --> CheckTLS: no (non-DMA)
+
+    CheckDMAFlag: --enable-dma + euid==0<br/>+ IOMMU probe
+    state CheckDMAFlag <<choice>>
+    CheckDMAFlag --> Abort: missing
+    CheckDMAFlag --> CheckTLS: OK
+
+    CheckTLS: TLS-capable transport?
+    state CheckTLS <<choice>>
+    CheckTLS --> CheckTrust: yes
+    CheckTLS --> Proceed: no (plain SSH/DMA)
+
+    CheckTrust: known_hosts OR tls_ca provided?
+    state CheckTrust <<choice>>
+    CheckTrust --> Abort: no
+    CheckTrust --> Proceed: yes
+
+    Proceed: run banner + sleep + acquire
+    Proceed --> [*]
+
+    Abort: raise AuthorizationError
+    Abort --> [*]
