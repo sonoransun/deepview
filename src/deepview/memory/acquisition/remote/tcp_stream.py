@@ -29,6 +29,7 @@ from deepview.core.types import (
     PrivilegeLevel,
 )
 from deepview.memory.acquisition.remote.base import RemoteAcquisitionProvider
+from deepview.utils.hashing import hash_file
 
 log = get_logger("memory.acquisition.remote.tcp_stream")
 
@@ -127,6 +128,8 @@ class TCPStreamProvider(RemoteAcquisitionProvider):
         except socket.timeout:
             log.warning("tcp_stream_timeout", bytes=size_bytes, peer=str(peer))
 
+        self._emit_progress(size_bytes, size_bytes, stage="hashing")
+        digest = hash_file(output)
         elapsed = time.time() - start
         self._context.events.publish(
             RemoteAcquisitionCompletedEvent(
@@ -142,6 +145,7 @@ class TCPStreamProvider(RemoteAcquisitionProvider):
             format=detected_fmt,
             size_bytes=size_bytes,
             duration_seconds=elapsed,
+            hash_sha256=digest,
         )
 
 
@@ -221,6 +225,8 @@ class UDPStreamProvider(RemoteAcquisitionProvider):
         finally:
             srv.close()
 
+        self._emit_progress(size_bytes, size_bytes, stage="hashing")
+        digest = hash_file(output)
         elapsed = time.time() - start
         self._context.events.publish(
             RemoteAcquisitionCompletedEvent(
@@ -236,4 +242,5 @@ class UDPStreamProvider(RemoteAcquisitionProvider):
             format=detected_fmt,
             size_bytes=size_bytes,
             duration_seconds=elapsed,
+            hash_sha256=digest,
         )

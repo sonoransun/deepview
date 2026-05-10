@@ -34,6 +34,7 @@ from deepview.core.types import (
     PrivilegeLevel,
 )
 from deepview.memory.acquisition.remote.base import RemoteAcquisitionProvider
+from deepview.utils.hashing import hash_file
 
 log = get_logger("memory.acquisition.remote.network_agent")
 
@@ -150,6 +151,8 @@ class NetworkAgentProvider(RemoteAcquisitionProvider):
             except Exception:  # noqa: BLE001
                 pass
 
+        self._emit_progress(size_bytes, size_bytes, stage="hashing")
+        digest = hash_file(output)
         elapsed = time.time() - start
         self._context.events.publish(
             RemoteAcquisitionCompletedEvent(
@@ -165,6 +168,7 @@ class NetworkAgentProvider(RemoteAcquisitionProvider):
             format=fmt,
             size_bytes=size_bytes,
             duration_seconds=elapsed,
+            hash_sha256=digest,
         )
 
 

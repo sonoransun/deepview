@@ -65,9 +65,9 @@ def build_remote_provider(
 
         return FireWireDMAProvider(endpoint, context=context)
     if t == "ipmi":
-        from deepview.memory.acquisition.remote.ipmi import IPMIProvider
+        from deepview.memory.acquisition.remote.ipmi import IPMIMemoryProvider
 
-        return IPMIProvider(endpoint, context=context)
+        return IPMIMemoryProvider(endpoint, context=context)
     if t == "amt":
         from deepview.memory.acquisition.remote.intel_amt import IntelAMTProvider
 

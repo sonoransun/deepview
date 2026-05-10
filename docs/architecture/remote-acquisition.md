@@ -84,16 +84,27 @@ the SSH / DMA / IPMI optional deps never load unless their transport was request
 
 | Transport | Module | Library dep | Privileges | Platforms | Dual-use notes |
 |-----------|--------|-------------|------------|-----------|----------------|
+### Memory-acquiring transports
+
+| Transport | Module | Library dep | Privileges | Platforms | Dual-use notes |
+|-----------|--------|-------------|------------|-----------|----------------|
 | `ssh` | `ssh_dd` | `paramiko` (optional) | target-side root for `/dev/mem`/`/proc/kcore`/kernel pagemap | Linux, macOS | Requires SSH credentials; producer runs `sudo dd` on target |
 | `tcp` | `tcp_stream` | stdlib `socket` | server runs with target privileges already | Any | Must be paired with a trusted ingest agent on target |
 | `udp` | `tcp_stream` (UDP) | stdlib `socket` | same | Any | Lossy by design — checksum every chunk |
-| `agent` | `network_agent` | stdlib `http.client` / optional `httpx` | agent process chooses | Any | Agent binary must ship with explicit authorization banner |
+| `agent` | `network_agent` | interim framed-TCP via stdlib `socket` + `ssl`; gRPC stubs planned | agent process chooses | Any | Agent binary must ship with explicit authorization banner. The advertised `grpcio` extra is checked by `is_available()` for parity with the planned transport, but the wire is currently a length-prefixed framed-TCP shim — don't read "gRPC" as a hard dep yet |
 | `lime` | `lime_remote` | stdlib | target-side root (LiME kernel module loaded) | Linux | Standard LKM-based memory acquisition over TCP |
 | `dma-tb` (Thunderbolt) | `dma_thunderbolt` | `leechcore` (optional) | host root, IOMMU must permit | Linux, Windows | **High dual-use risk** — bypasses OS; IOMMU caveat emitted on probe |
 | `dma-pcie` | `dma_pcie` | `leechcore` / `PCILeech` (optional) | host root | Linux, Windows | Same warning applies |
 | `dma-fw` (FireWire) | `dma_firewire` | `pyfwhost` (optional) | host root | Linux | Legacy attack surface; included for forensic completeness |
-| `ipmi` | `ipmi` | `pyghmi` (optional) | BMC credentials | Any | Talks to BMC, not OS; side-channel for power-state + SEL data |
-| `amt` | `intel_amt` | `amt-api` (optional) | AMT credentials + target enabled | Intel-only | Out-of-band, pre-boot access; highest trust needed |
+
+### Out-of-band telemetry transports
+
+These two transports do **not** acquire host memory. They live in the same factory and CLI surface for ergonomic reasons (one auth/audit gate, one credential model), but the artifacts they capture are categorically different — BMC events, serial console traces, or a boot-redirect manifest. To capture host RAM after a redirect, chain a separate memory-acquiring transport once the target reboots into a forensic ISO.
+
+| Transport | Module | Library dep | Captures | Notes |
+|-----------|--------|-------------|----------|-------|
+| `ipmi` | `ipmi` | `pyghmi` (optional) | BMC SEL log (default); BMC firmware via vendor-gated OEM commands (Dell / Supermicro opt-in; HPE refuses by design) | The provider explicitly disclaims memory acquisition in its docstring. Result includes SHA256 of the captured artifact. |
+| `amt` | `intel_amt` | stdlib + TLS via `requests` Digest auth or `urllib` | SOL serial console recording (default) **or** WS-MAN boot-order change + JSON manifest (IDE-Redirect mode) | Operator must chain a separate memory-acquiring transport after a boot-redirect; AMT alone never produces a memory image. |
 
 ## SSH-DD acquisition flow
 
@@ -263,7 +274,7 @@ stateDiagram-v2
 
 ## Fail-secure, never silent
 
-Four invariants the subsystem never violates:
+Five invariants the subsystem never violates:
 
 1. **No default credentials in memory.** `RemoteEndpoint` stores credentials only by
    indirection: `password_env` is an *environment-variable name*, `identity_file` /
@@ -281,6 +292,13 @@ Four invariants the subsystem never violates:
    by default; opting out requires setting it `False` explicitly. `NetworkAgentProvider`
    and `TCPStreamProvider` refuse to start without a verified `tls_ca` when
    `require_tls` is true.
+5. **Every `AcquisitionResult` carries a SHA256.** After the stream completes, the
+   provider rehashes the file on disk via `deepview.utils.hashing.hash_file` and sets
+   `AcquisitionResult.hash_sha256`. The hash is computed from the bytes that landed on
+   disk — not from in-flight chunks — so silent corruption between the network and the
+   filesystem is detected. On large DMA captures this rehash takes a measurable wall-clock
+   beat after the last `stage="stream"` event; the provider publishes a single
+   `RemoteAcquisitionProgressEvent` with `stage="hashing"` so the operator can see it.
 
 !!! note "DMA is dual-use"
     Thunderbolt / PCIe / FireWire DMA captures are a defensive forensic tool and a

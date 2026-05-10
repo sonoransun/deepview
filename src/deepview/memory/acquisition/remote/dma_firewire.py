@@ -39,6 +39,7 @@ from deepview.core.types import (
     PrivilegeLevel,
 )
 from deepview.memory.acquisition.remote.base import RemoteAcquisitionProvider
+from deepview.utils.hashing import hash_file
 
 log = get_logger("memory.acquisition.remote.dma_firewire")
 
@@ -248,6 +249,8 @@ class FireWireDMAProvider(RemoteAcquisitionProvider):
         except Exception:
             raise
 
+        self._emit_progress(size_bytes, size_bytes, stage="hashing")
+        digest = hash_file(output)
         elapsed = time.time() - start
         self._context.events.publish(
             RemoteAcquisitionCompletedEvent(
@@ -264,4 +267,5 @@ class FireWireDMAProvider(RemoteAcquisitionProvider):
             format=fmt,
             size_bytes=size_bytes,
             duration_seconds=elapsed,
+            hash_sha256=digest,
         )

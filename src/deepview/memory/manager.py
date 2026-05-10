@@ -86,7 +86,7 @@ class MemoryManager:
 
         for cls in provider_classes:
             try:
-                provider = cls()
+                provider = cls(context=self._context)
                 if provider.is_available():
                     self._providers[provider.provider_name()] = provider
                     log.info("provider_available", provider=provider.provider_name())

@@ -139,8 +139,10 @@ sequenceDiagram
         SSH->>BUS: RemoteAcquisitionProgressEvent(bytes_done, bytes_total, stage="stream")
     end
     TGT-->>NET: channel close
+    SSH->>BUS: RemoteAcquisitionProgressEvent(stage="hashing")
+    SSH->>SSH: hash_file(output) -> sha256
     SSH->>BUS: RemoteAcquisitionCompletedEvent(output, size_bytes, elapsed_s)
-    SSH-->>CLI: AcquisitionResult
+    SSH-->>CLI: AcquisitionResult(hash_sha256=...)
 ```
 
 ### Terminal output
@@ -155,8 +157,16 @@ in 5 seconds. Press ^C to abort.
 [progress] 1024 MiB / 16384 MiB (6.3%)  throughput=53.1 MB/s
 ...
 [progress] 16384 MiB / 16384 MiB (100.0%)  throughput=54.0 MB/s
-done: output=target.mem.raw size=17179869184 format=raw elapsed=303.41s
+[hashing] target.mem.raw
+done: output=target.mem.raw size=17179869184 format=raw elapsed=303.41s sha256=4f3c...e91a
 ```
+
+!!! note "The hash is computed from disk, after the stream"
+    SHA256 is rehashed from the file on disk *after* the stream
+    completes — not from in-flight chunks. That catches silent
+    corruption between the network and the local filesystem. On a
+    16 GiB capture you'll see a measurable beat between the last
+    `[progress]` line and the `[hashing]` line; that's expected.
 
 !!! tip "Tail the progress events from the dashboard"
     Run `deepview dashboard run --layout=full` in another terminal

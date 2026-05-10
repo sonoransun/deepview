@@ -3,7 +3,9 @@ from __future__ import annotations
 import shutil
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from deepview.core.events import MemoryAcquiredEvent
 from deepview.core.types import (
     Platform, PrivilegeLevel, DumpFormat,
     AcquisitionTarget, AcquisitionResult,
@@ -14,6 +16,9 @@ from deepview.core.platform import detect_platform
 from deepview.interfaces.acquisition import MemoryAcquisitionProvider
 from deepview.memory.acquisition.base import make_result
 
+if TYPE_CHECKING:
+    from deepview.core.context import AnalysisContext
+
 log = get_logger("memory.acquisition.live")
 
 LIVE_SOURCES = ["/proc/kcore", "/dev/mem", "/dev/crash"]
@@ -21,6 +26,9 @@ LIVE_SOURCES = ["/proc/kcore", "/dev/mem", "/dev/crash"]
 
 class LiveMemoryProvider(MemoryAcquisitionProvider):
     """Direct live memory access via /proc/kcore or /dev/mem."""
+
+    def __init__(self, context: AnalysisContext | None = None) -> None:
+        self._context = context
 
     @classmethod
     def provider_name(cls) -> str:
@@ -64,4 +72,13 @@ class LiveMemoryProvider(MemoryAcquisitionProvider):
                 except (IOError, OSError):
                     break  # Expected at end of readable memory
 
-        return make_result(output, fmt, start)
+        result_obj = make_result(output, fmt, start)
+        if self._context is not None:
+            self._context.events.publish(
+                MemoryAcquiredEvent(
+                    path=str(output),
+                    dump_format=fmt,
+                    size_bytes=result_obj.size_bytes,
+                )
+            )
+        return result_obj

@@ -2,7 +2,9 @@
 from __future__ import annotations
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from deepview.core.events import MemoryAcquiredEvent
 from deepview.core.types import (
     Platform, PrivilegeLevel, DumpFormat,
     AcquisitionTarget, AcquisitionResult,
@@ -13,11 +15,17 @@ from deepview.interfaces.acquisition import MemoryAcquisitionProvider
 from deepview.utils.process import find_tool, run_command
 from deepview.memory.acquisition.base import make_result
 
+if TYPE_CHECKING:
+    from deepview.core.context import AnalysisContext
+
 log = get_logger("memory.acquisition.avml")
 
 
 class AVMLProvider(MemoryAcquisitionProvider):
     """Memory acquisition using Microsoft's AVML tool."""
+
+    def __init__(self, context: AnalysisContext | None = None) -> None:
+        self._context = context
 
     @classmethod
     def provider_name(cls) -> str:
@@ -51,4 +59,13 @@ class AVMLProvider(MemoryAcquisitionProvider):
         if not result.success:
             raise AcquisitionError(f"AVML failed: {result.stderr}")
 
-        return make_result(output, fmt, start)
+        result_obj = make_result(output, fmt, start)
+        if self._context is not None:
+            self._context.events.publish(
+                MemoryAcquiredEvent(
+                    path=str(output),
+                    dump_format=fmt,
+                    size_bytes=result_obj.size_bytes,
+                )
+            )
+        return result_obj

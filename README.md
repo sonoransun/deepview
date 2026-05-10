@@ -243,6 +243,35 @@ More detail in [`docs/overview/data-layer-composition.md`](docs/overview/data-la
 
 ## Subsystem capability matrices
 
+### Acquisition implementation status
+
+This table is the source of truth for what Deep View can capture today versus what it can only parse or read. The other tables in this section list shipped modules; this one calls out maturity gaps so a reader can tell whether a row means "we acquire from the device" or "bring us a dump from another tool".
+
+| Status | Meaning |
+|--------|---------|
+| ✅ Wired | End-to-end implementation. CLI path exists, optional dep listed below. Result includes SHA256 for chain-of-custody. |
+| 🚧 Partial | Implementation exists with caveats called out in the row. |
+| 📥 Parser-only | Deep View parses the format if you bring a dump from an external tool. We do not capture from the device. |
+| ❌ Planned | Extra declared in `pyproject.toml` and/or class scaffolded; no runtime path yet. |
+
+| Family | Status | Notes |
+|--------|--------|-------|
+| Local memory (Linux LiME / AVML / `/proc/kcore`, macOS OSXPmem, Windows WinPmem) | ✅ | Publishes `MemoryAcquiredEvent` when invoked through `MemoryManager`. |
+| Remote SSH-dd (`/dev/mem`, `/proc/kcore` over SSH) | ✅ | `--known-hosts` mandatory; result includes SHA256. |
+| Remote LiME (pre-staged module + reverse SSH tunnel) | ✅ | Result includes SHA256. |
+| Remote TCP / UDP stream | ✅ | Result includes SHA256. |
+| Remote network agent | 🚧 | Currently a framed-TCP shim with TLS; gRPC stubs planned. Wire format is stable but the optional dep advertised (`grpcio`) is not yet exercised. |
+| DMA Thunderbolt / PCIe / FireWire (PCILeech / forensic1394) | ✅ | Requires `--enable-dma` + root + IOMMU off on target. Result includes SHA256. |
+| IPMI | 🚧 | **Out-of-band only — does not acquire host RAM.** Captures BMC SEL log; vendor-gated BMC firmware path is opt-in (Dell / Supermicro), HPE refuses by design. |
+| Intel AMT | 🚧 | **Out-of-band only — does not acquire host RAM.** Either records SOL serial console to disk, or issues WS-MAN boot-order change + writes a JSON manifest. To capture memory after a boot-redirect, chain a separate provider once the target reboots into a forensic ISO. |
+| WinRM | ❌ | No provider yet. |
+| Hardware chip-off (NAND / eMMC / SPI-NOR / JTAG) | 📥 | Capture with flashrom / Dediprog / OpenOCD / J-Link. Deep View parses the resulting binary, runs ECC (Hamming / BCH / RS), and walks FTLs (UBI / JFFS2 / MTD / UFS / eMMC hints). |
+| GPU VRAM (NVIDIA / AMD / Intel) | 📥 | Capture with NVML / ROCm / Level Zero. `GPUVRAMLayer` is a flat passthrough with a vendor tag for downstream plugins. |
+| VM introspection (LibVMI / DRAKVUF) | ❌ | `vm` extra is empty; `deepview vm` covers snapshot extraction via hypervisor APIs but not pointer-chasing introspection. |
+| Firmware (UEFI / BIOS via chipsec) | ❌ | `firmware` extra declared, no runtime path. The `deepview scan firmware` subcommand operates on captured firmware images, not live SPI flash. |
+| Hibernation / swap / standby compressed | ✅ Parser | Pair with any acquisition above (or a disk image) — `xpress`, `wkdm`, `zram` / `zswap` / `swap`, `standby_compression` decoders. |
+| Encrypted containers (LUKS / BitLocker / FileVault2 / VeraCrypt) | ✅ Unlock | Pair with any layer source. |
+
 ### Memory imaging
 
 | Format | Typical source | Parser |
@@ -364,13 +393,15 @@ Every remote provider is gated by `--confirm` and `--authorization-statement`; D
 | `ssh-dd` | `ssh_dd.py` | SSH creds + target sudo | `paramiko` |
 | `tcp` | `tcp_stream.py` | TCP listener on target | stdlib |
 | `udp` | `tcp_stream.py` (UDP mode) | UDP listener + framing | stdlib |
-| `network-agent` | `network_agent.py` | deployed gRPC agent | `grpcio` |
+| `network-agent` | `network_agent.py` | deployed agent (interim framed-TCP, gRPC planned) | `grpcio` (advertised; not yet exercised) |
 | `lime-remote` | `lime_remote.py` | LiME module loaded on target | stdlib |
 | `dma-tb` | `dma_thunderbolt.py` | TB cable + FPGA + **root + IOMMU off** | `leechcore` |
 | `dma-pcie` | `dma_pcie.py` | PCIe card (Screamer, SP605) + **root** | `leechcore` |
 | `dma-fw` | `dma_firewire.py` | FireWire cable + OHCI + **root** | `forensic1394` |
 | `ipmi` | `ipmi.py` | BMC IPMI credentials | `python-ipmi` |
 | `amt` | `intel_amt.py` | Intel AMT provisioned | stdlib + TLS |
+
+> **`ipmi` / `amt` are out-of-band telemetry transports — they do not acquire host RAM.**  IPMI dumps the BMC SEL log (and, on opt-in vendor paths, BMC firmware); AMT records the SOL serial console or triggers a boot-redirect into a forensic ISO. To capture host memory after a redirect, chain a separate provider once the target reboots.
 
 See [`docs/architecture/remote-acquisition.md`](docs/architecture/remote-acquisition.md).
 

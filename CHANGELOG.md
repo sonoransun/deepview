@@ -6,7 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+- `deepview remote-image ipmi` no longer crashes at construction; the factory was importing `IPMIProvider` (nonexistent) instead of `IPMIMemoryProvider`.
+
+### Added
+- Every `AcquisitionResult` from a remote provider (SSH-dd, LiME-remote, TCP, UDP, network-agent, DMA Thunderbolt / PCIe / FireWire) now carries a SHA256 of the bytes that landed on disk. Providers publish a `RemoteAcquisitionProgressEvent` with `stage="hashing"` so the post-stream rehash is visible.
+- Local memory providers (LiME, AVML, OSXPmem, WinPmem, `LiveMemoryProvider`) accept an optional `context: AnalysisContext` and publish `MemoryAcquiredEvent` after a successful capture. `MemoryManager._detect_providers` now threads the manager's context through.
+
+### Documentation
+- README adds an "Acquisition implementation status" table that distinguishes wired transports from parser-only formats and planned work; calls out `ipmi` / `amt` as out-of-band telemetry that does not acquire host RAM, the `agent` transport as an interim framed-TCP shim with gRPC planned, and WinRM as not implemented.
+- `docs/architecture/remote-acquisition.md` splits the transport catalogue into memory-acquiring vs. out-of-band telemetry, and adds the SHA256 invariant to the fail-secure list.
 
 ## [0.2.0] — 2026-04-15
 
