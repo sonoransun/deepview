@@ -78,6 +78,25 @@ class LiveProcessLayer(DataLayer):
             self._fd = os.open(f"/proc/{self._pid}/mem", os.O_RDONLY)
         return self._fd
 
+    def _find_region(self, offset: int) -> MapRegion | None:
+        """Return the mapped region containing virtual address *offset*, else None.
+
+        ``/proc/[pid]/maps`` is address-sorted, so a binary search keeps
+        per-read lookup cheap even for processes with thousands of mappings.
+        """
+        regions = self._regions
+        lo, hi = 0, len(regions)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            region = regions[mid]
+            if offset < region.start:
+                hi = mid
+            elif offset >= region.end:
+                lo = mid + 1
+            else:
+                return region
+        return None
+
     def read(self, offset: int, length: int, *, pad: bool = False) -> bytes:
         region = self._find_region(offset)
         if region is None:

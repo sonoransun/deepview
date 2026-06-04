@@ -185,3 +185,73 @@ def test_argon2id_determinism() -> None:
     a = argon2id(payload)
     b = argon2id(payload)
     assert a == b
+
+
+def test_argon2id_known_answer_fixed_vector() -> None:
+    """Pin the raw Argon2id output for fixed params — catches any regression
+    in how the offload wrapper maps parameters onto argon2-cffi.
+
+    (argon2-cffi's hash_secret_raw exposes neither the secret-key nor the
+    associated-data inputs the literal RFC 9106 vector uses, so this is a
+    fixed known-answer computed from the reference implementation rather than
+    the RFC vector itself.)
+    """
+    pytest.importorskip("argon2")
+    payload = {
+        "password": b"deepview-kat-password",
+        "salt": b"0123456789abcdef",
+        "time_cost": 3,
+        "memory_cost": 256,
+        "parallelism": 2,
+        "dklen": 32,
+    }
+    expected = bytes.fromhex(
+        "cf298c2e50107e0de735259c112fc5ff67ed0b1c0a15b7ffe5b47cfd547e8421"
+    )
+    assert argon2id(payload) == expected
+
+
+def test_argon2id_matches_reference_low_level() -> None:
+    """The offload wrapper is a faithful pass-through to argon2-cffi's
+    Type.ID hash_secret_raw (same params -> same bytes)."""
+    pytest.importorskip("argon2")
+    from argon2 import low_level
+
+    password, salt = b"pass-through", b"sixteen-byte-slt"
+    payload = {
+        "password": password,
+        "salt": salt,
+        "time_cost": 2,
+        "memory_cost": 128,
+        "parallelism": 1,
+        "dklen": 32,
+    }
+    ref = low_level.hash_secret_raw(
+        secret=password, salt=salt, time_cost=2, memory_cost=128,
+        parallelism=1, hash_len=32, type=low_level.Type.ID,
+    )
+    assert argon2id(payload) == ref
+
+
+def test_argon2id_runs_through_offload_engine() -> None:
+    """End-to-end: an Argon2id job dispatched through the real OffloadEngine
+    (the path container unlock uses) returns the same key as a direct call,
+    and records which backend executed it."""
+    pytest.importorskip("argon2")
+    from deepview.core.context import AnalysisContext
+    from deepview.offload.jobs import make_job
+
+    ctx = AnalysisContext.for_testing()
+    payload = {
+        "password": b"engine-pw",
+        "salt": b"sixteen-byte-slt",
+        "time_cost": 2,
+        "memory_cost": 64,
+        "parallelism": 1,
+        "dklen": 32,
+    }
+    job = make_job("argon2id", payload, callable_ref="deepview.offload.kdf:argon2id")
+    result = ctx.offload.submit(job).await_result(timeout=60.0)
+    assert result.ok, result.error
+    assert result.output == argon2id(payload)
+    assert result.backend in ("process", "thread")

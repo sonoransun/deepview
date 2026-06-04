@@ -12,6 +12,27 @@ class ECCResult:
     errors_corrected: int
     uncorrectable: bool
 
+    def __post_init__(self) -> None:
+        # Guard the two invariants every decoder upholds: a non-negative
+        # error count, and that an uncorrectable codeword cannot
+        # simultaneously claim corrected errors. ``ECCDataLayer`` accumulates
+        # ``errors_corrected`` only on the corrected branch, so a
+        # contradictory result would silently skew its error statistics.
+        if self.errors_corrected < 0:
+            raise ValueError(
+                f"errors_corrected must be >= 0, got {self.errors_corrected}"
+            )
+        if self.uncorrectable and self.errors_corrected != 0:
+            raise ValueError(
+                "uncorrectable result cannot also report corrected errors "
+                f"(errors_corrected={self.errors_corrected})"
+            )
+
+    @property
+    def ok(self) -> bool:
+        """True when the payload decoded to usable bytes (correctable)."""
+        return not self.uncorrectable
+
 
 class ECCDecoder(ABC):
     """Stateless error-correcting code decoder (NAND/eMMC style)."""

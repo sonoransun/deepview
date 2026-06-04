@@ -59,10 +59,16 @@ def decompress_wkdm(buf: bytes, expected_size: int = WKDM_PAGE_SIZE) -> bytes:
 
     Raises
     ------
+    ValueError
+        If *expected_size* is not the 4 KiB WKdm page size, if the stream is
+        shorter than the 16-byte header, or if the header's section
+        end-offsets are not monotonically non-decreasing or point past the
+        end of the compressed buffer (a structurally impossible header).
     NotImplementedError
-        Always, currently — the full bit-packing decoder is not implemented.
-        The stub is in place so that callers can structure their code around
-        the intended API; see the module docstring for the algorithm.
+        When the header is well-formed but the full bit-packing decoder is
+        not implemented. The stub is in place so that callers can structure
+        their code around the intended API; see the module docstring for the
+        algorithm.
     """
     if expected_size != WKDM_PAGE_SIZE:
         raise ValueError(
@@ -75,12 +81,33 @@ def decompress_wkdm(buf: bytes, expected_size: int = WKDM_PAGE_SIZE) -> bytes:
     # Parse the 4-word header so downstream code that upgrades this module
     # has a starting point. The offsets below are documented in XNU's
     # ``osfmk/vm/WKdmCompress.c`` / ``WKdmDecompress.c``.
-    # Each header word is a count of 32-bit words consumed by the
-    # corresponding section.
-    _tags_end_word = int.from_bytes(buf[0:4], "little")      # noqa: F841
-    _full_words_end = int.from_bytes(buf[4:8], "little")     # noqa: F841
-    _dict_refs_end = int.from_bytes(buf[8:12], "little")     # noqa: F841
-    _low_bits_end = int.from_bytes(buf[12:16], "little")     # noqa: F841
+    # Each header word is the *end* offset (in 32-bit words, measured from the
+    # start of the compressed stream) of the corresponding section, so the
+    # four values must be monotonically non-decreasing and must not run past
+    # the end of ``buf``.
+    tags_end_word = int.from_bytes(buf[0:4], "little")
+    full_words_end = int.from_bytes(buf[4:8], "little")
+    dict_refs_end = int.from_bytes(buf[8:12], "little")
+    low_bits_end = int.from_bytes(buf[12:16], "little")
+
+    section_ends = (tags_end_word, full_words_end, dict_refs_end, low_bits_end)
+    # The header occupies the first 4 words, so every section must end at or
+    # after word 4.
+    buf_words = len(buf) // 4
+    prev = 4
+    for section_end in section_ends:
+        if section_end < prev:
+            raise ValueError(
+                "WKdm: header section end-offsets are not monotonically "
+                f"non-decreasing (offsets={section_ends})"
+            )
+        if section_end > buf_words:
+            raise ValueError(
+                "WKdm: header section end-offset "
+                f"{section_end} words exceeds the {buf_words}-word "
+                "compressed buffer"
+            )
+        prev = section_end
 
     raise NotImplementedError(
         "WKdm decoder stub: pure-Python bit-stream decoder for the "

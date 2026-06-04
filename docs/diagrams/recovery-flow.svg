@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" font-family="-apple-system, Segoe UI, Roboto, sans-serif" role="img" aria-label="Deep View recovery decision flow">
+  <title>Deep View recovery decision flow</title>
+  <rect x="0" y="0" width="960" height="420" fill="#0d1117"/>
+  <text x="480" y="32" fill="#c9d1d9" font-size="18" font-weight="700" text-anchor="middle">Recovery: what do you have?</text>
+
+  <!-- central question -->
+  <rect x="400" y="52" width="160" height="48" rx="24" fill="#1a1a2e" stroke="#16213e" stroke-width="2"/>
+  <text x="480" y="81" fill="#fff" font-size="13" font-weight="600" text-anchor="middle">source image</text>
+
+  <!-- capability boxes -->
+  <g font-size="11">
+    <rect x="20"  y="150" width="200" height="58" rx="9" fill="#0f3460" stroke="#16213e"/>
+    <text x="120" y="174" fill="#fff" font-weight="600" text-anchor="middle">FS intact → undelete</text>
+    <text x="120" y="192" fill="#cfe3ff" text-anchor="middle">list(include_deleted=True)</text>
+
+    <rect x="240" y="150" width="200" height="58" rx="9" fill="#0f3460" stroke="#16213e"/>
+    <text x="340" y="174" fill="#fff" font-weight="600" text-anchor="middle">unallocated → carve</text>
+    <text x="340" y="192" fill="#cfe3ff" text-anchor="middle">StringCarver + YARA</text>
+
+    <rect x="520" y="150" width="200" height="58" rx="9" fill="#0f3460" stroke="#16213e"/>
+    <text x="620" y="174" fill="#fff" font-weight="600" text-anchor="middle">memory → volatile</text>
+    <text x="620" y="192" fill="#cfe3ff" text-anchor="middle">command_history · sockets</text>
+
+    <rect x="740" y="150" width="200" height="58" rx="9" fill="#0f3460" stroke="#16213e"/>
+    <text x="840" y="174" fill="#fff" font-weight="600" text-anchor="middle">encrypted → unlock</text>
+    <text x="840" y="192" fill="#cfe3ff" text-anchor="middle">key-from-memory → unlock</text>
+
+    <rect x="130" y="250" width="200" height="58" rx="9" fill="#533483" stroke="#0f3460"/>
+    <text x="230" y="274" fill="#fff" font-weight="600" text-anchor="middle">bit-rot → repair</text>
+    <text x="230" y="292" fill="#e9defc" text-anchor="middle">ECCDataLayer + FTL remap</text>
+
+    <rect x="380" y="250" width="200" height="58" rx="9" fill="#533483" stroke="#0f3460"/>
+    <text x="480" y="274" fill="#fff" font-weight="600" text-anchor="middle">bad table → rebuild</text>
+    <text x="480" y="292" fill="#e9defc" text-anchor="middle">MBR/GPT → PartitionLayer</text>
+
+    <rect x="630" y="250" width="200" height="58" rx="9" fill="#533483" stroke="#0f3460"/>
+    <text x="730" y="274" fill="#fff" font-weight="600" text-anchor="middle">swap/hibernation</text>
+    <text x="730" y="292" fill="#e9defc" text-anchor="middle">zram/zswap/swap decoders</text>
+  </g>
+
+  <!-- output -->
+  <rect x="350" y="350" width="260" height="50" rx="10" fill="#16c79a" stroke="#0f3460" stroke-width="2"/>
+  <text x="480" y="372" fill="#06281f" font-size="13" font-weight="700" text-anchor="middle">Recovered artifacts</text>
+  <text x="480" y="390" fill="#06281f" font-size="11" text-anchor="middle">ArtifactStore · timeline · report</text>
+
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8b949e"/>
+    </marker>
+  </defs>
+  <g stroke="#8b949e" stroke-width="1.6" fill="none" marker-end="url(#ar)">
+    <line x1="440" y1="86" x2="120" y2="148"/>
+    <line x1="455" y1="92" x2="340" y2="148"/>
+    <line x1="505" y1="92" x2="620" y2="148"/>
+    <line x1="520" y1="86" x2="840" y2="148"/>
+    <line x1="120" y1="208" x2="210" y2="248"/>
+    <line x1="620" y1="208" x2="700" y2="248"/>
+    <line x1="230" y1="308" x2="430" y2="350"/>
+    <line x1="480" y1="308" x2="480" y2="348"/>
+    <line x1="730" y1="308" x2="540" y2="350"/>
+    <line x1="340" y1="208" x2="430" y2="350"/>
+    <line x1="840" y1="208" x2="560" y2="352"/>
+  </g>
+</svg>

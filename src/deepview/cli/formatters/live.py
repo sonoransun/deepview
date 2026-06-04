@@ -50,7 +50,12 @@ def _format_event_row(event: MonitorEvent) -> list[str]:
     wall_s = event.wall_clock_ns / 1e9 if event.wall_clock_ns else 0.0
     ts = time.strftime("%H:%M:%S", time.localtime(wall_s)) if wall_s else "-"
     syscall = event.syscall_name or (str(event.syscall_nr) if event.syscall_nr >= 0 else "-")
-    args_str = ", ".join(f"{k}={v}" for k, v in list(event.args.items())[:4])
+    items = list(event.args.items())
+    args_str = ", ".join(f"{k}={v}" for k, v in items[:4])
+    if len(items) > 4:
+        # Signal truncation so the row is not silently misleading about how
+        # many arguments the event actually carried.
+        args_str += f", +{len(items) - 4} more"
     category = event.category.value if event.category else ""
     return [ts, str(pid), comm, str(uid), category, syscall, args_str]
 

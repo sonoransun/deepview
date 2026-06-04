@@ -159,3 +159,68 @@ class TestZRAMLayerStdlibFallback:
         assert layer.read(0, 16) == page_a[:16]
         assert layer.read(4096, 16) == page_b[:16]
         assert layer.read(4090, 12) == page_a[-6:] + page_b[:6]
+
+
+class TestZRAMAcceleratedCodecs:
+    """Round-trips through the real accelerated codecs (skip-gated)."""
+
+    @staticmethod
+    def _page(tag: bytes) -> bytes:
+        page = (tag * (4096 // len(tag) + 1))[:4096]
+        assert len(page) == 4096
+        return page
+
+    def test_zstd_round_trip(self) -> None:
+        zstd = pytest.importorskip("zstandard")
+        page = self._page(b"zstd-page ")
+        blob = zstd.ZstdCompressor().compress(page)
+        backing = BytesBackingLayer(blob)
+        layer = ZRAMLayer(backing, "zstd", page_table=[(0, 0, len(blob))])
+        assert layer.read(0, 4096) == page
+
+    def test_lz4_block_round_trip(self) -> None:
+        lz4_block = pytest.importorskip("lz4.block")
+        page = self._page(b"lz4-block ")
+        # zram frames as raw lz4 block on older kernels; the layer falls back
+        # to lz4.block when lz4.frame.decompress raises on a non-framed blob.
+        blob = lz4_block.compress(page, store_size=False)
+        backing = BytesBackingLayer(blob)
+        layer = ZRAMLayer(backing, "lz4", page_table=[(0, 0, len(blob))])
+        assert layer.read(0, 4096) == page
+
+    def test_lzo_round_trip(self) -> None:
+        lzo = pytest.importorskip("lzo")
+        page = self._page(b"lzo-page ")
+        blob = lzo.compress(page, 1, False)
+        backing = BytesBackingLayer(blob)
+        layer = ZRAMLayer(backing, "lzo", page_table=[(0, 0, len(blob))])
+        assert layer.read(0, 4096) == page
+
+
+class TestZRAMMissingCodec:
+    def test_codec_missing_message(self) -> None:
+        from deepview.storage.encodings._codecs import codec_missing
+
+        for algo, pkg in (("lz4", "lz4"), ("lzo", "python-lzo"), ("zstd", "zstandard")):
+            err = codec_missing(algo)
+            assert isinstance(err, ImportError)
+            assert "deepview[compression]" in str(err)
+            assert pkg in str(err)
+
+    def test_missing_codec_raises_clear_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Force the lz4 import to fail regardless of whether lz4 is installed,
+        # so the actionable message is asserted deterministically.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name: str, *args: object, **kwargs: object) -> object:
+            if name.startswith("lz4"):
+                raise ImportError("forced for test")
+            return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        backing = BytesBackingLayer(b"\xff\xff\xff\xff")
+        layer = ZRAMLayer(backing, "lz4", page_table=[(0, 0, 4)])
+        with pytest.raises(ImportError, match=r"deepview\[compression\]"):
+            layer.read(0, 4096)

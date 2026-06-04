@@ -289,6 +289,10 @@ def test_raw_nand_through_fat() -> None:
 
     assert fs.read("/HELLO.TXT") == _FAT_PAYLOAD
 
+    # The FAT walk above only touches the allocated pages, so force every page
+    # through the ECC decoder to prove all injected bit-flips are correctable.
+    _ = linearized.read(0, len(fat_image))
+
     # Every page should have contributed at least one ECC correction.
     stats = ecc_layer.error_stats()
     assert stats["corrected"] >= pages

@@ -81,6 +81,47 @@ def test_dma_aliases_resolve_to_same_class(context) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Every transport selector constructs (regression guard for import-name drift)
+# ---------------------------------------------------------------------------
+
+
+# One canonical selector per concrete provider. If a factory branch imports a
+# class name that does not exist (as the IPMI branch once did), constructing it
+# raises AttributeError here — not ImportError — so the test fails loudly.
+_ALL_TRANSPORTS = [
+    "ssh",
+    "tcp",
+    "udp",
+    "agent",
+    "lime",
+    "dma-tb",
+    "dma-pcie",
+    "dma-fw",
+    "ipmi",
+    "amt",
+]
+
+
+@pytest.mark.parametrize("selector", _ALL_TRANSPORTS)
+def test_every_transport_builds(selector: str, context) -> None:
+    """Each CLI transport selector resolves to a real provider class.
+
+    Optional-dependency transports (SSH/DMA) ``skip`` cleanly when their extra
+    is absent; a wrong class name surfaces as an AttributeError failure.
+    """
+    endpoint = RemoteEndpoint(host="10.0.0.9", transport="tcp")
+    try:
+        provider = build_remote_provider(selector, endpoint, context=context)
+    except ImportError:
+        pytest.skip(f"{selector}: optional transport dependency not installed")
+        return
+    assert isinstance(provider, RemoteAcquisitionProvider)
+    assert provider.endpoint is endpoint
+    name = provider.transport_name()
+    assert isinstance(name, str) and name
+
+
+# ---------------------------------------------------------------------------
 # Module-level registration stability across re-imports
 # ---------------------------------------------------------------------------
 

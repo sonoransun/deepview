@@ -7,10 +7,12 @@ from deepview.core.events import EventBus
 from deepview.core.platform import PlatformInfo
 
 if TYPE_CHECKING:
+    from deepview.instrumentation.manager import InstrumentationManager
     from deepview.offload.engine import OffloadEngine
     from deepview.plugins.registry import PluginRegistry
     from deepview.storage.containers.unlock import UnlockOrchestrator
     from deepview.storage.manager import StorageManager
+    from deepview.vm.manager import VMManager
 
 
 class LayerRegistry:
@@ -72,6 +74,8 @@ class AnalysisContext:
         self._offload_engine: OffloadEngine | None = None
         self._storage_manager: StorageManager | None = None
         self._unlock_orchestrator: UnlockOrchestrator | None = None
+        self._vm_manager: VMManager | None = None
+        self._instrumentation_manager: InstrumentationManager | None = None
 
     @property
     def plugins(self) -> PluginRegistry:
@@ -100,6 +104,20 @@ class AnalysisContext:
             from deepview.storage.containers.unlock import UnlockOrchestrator
             self._unlock_orchestrator = UnlockOrchestrator(self)
         return self._unlock_orchestrator
+
+    @property
+    def vm(self) -> VMManager:
+        if self._vm_manager is None:
+            from deepview.vm.manager import VMManager
+            self._vm_manager = VMManager(self)
+        return self._vm_manager
+
+    @property
+    def instrumentation(self) -> InstrumentationManager:
+        if self._instrumentation_manager is None:
+            from deepview.instrumentation.manager import InstrumentationManager
+            self._instrumentation_manager = InstrumentationManager(self)
+        return self._instrumentation_manager
 
     @classmethod
     def from_config(cls, config_path=None) -> AnalysisContext:

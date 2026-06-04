@@ -2,7 +2,7 @@
 from __future__ import annotations
 import struct
 from deepview.core.logging import get_logger
-from deepview.core.exceptions import DisassemblyError, RelocationError
+from deepview.core.exceptions import DisassemblyError
 
 log = get_logger("instrumentation.binary.trampoline")
 
@@ -129,6 +129,87 @@ class TrampolineGenerator:
             parts.extend(stolen_bytes)
 
             # Jump back to original function (after stolen bytes)
+            jmp_from = base_addr + len(parts)
+            jmp_back = self.generate_jump(jmp_from, return_addr)
+            parts.extend(jmp_back)
+
+        elif self._arch == "aarch64":
+            # Save caller-saved registers via STP pairs onto a sub'd stack.
+            # We preserve X0..X17 (the argument/temporary registers the hook
+            # may clobber) plus X29/X30 (frame pointer + link register, since
+            # we issue a BLR). 10 pairs * 16 bytes = 160 bytes of stack space.
+            #
+            # STP encoding (pre-index, 64-bit): 1010 1001 10 imm7 Rt2 Rn Rt
+            #   base = 0xA9800000 (STP <Xt1>, <Xt2>, [SP, #imm]!)
+            # imm7 is the offset scaled by 8 (signed). For the first pair we
+            # pre-decrement SP by -160 (imm7 = -20 = 0x6C in 7-bit two's-comp);
+            # subsequent pairs store at positive scaled offsets without writeback.
+            #
+            # LDP encoding (post-index / offset, 64-bit):
+            #   base = 0xA9400000 (LDP <Xt1>, <Xt2>, [SP, #imm])
+            def _stp(rt1: int, rt2: int, imm7: int, writeback: bool) -> int:
+                base = 0xA9800000 if writeback else 0xA9000000
+                return base | ((imm7 & 0x7F) << 15) | (rt2 << 10) | (31 << 5) | rt1
+
+            def _ldp(rt1: int, rt2: int, imm7: int, writeback: bool) -> int:
+                base = 0xA8C00000 if writeback else 0xA9400000
+                return base | ((imm7 & 0x7F) << 15) | (rt2 << 10) | (31 << 5) | rt1
+
+            reg_pairs = [
+                (0, 1), (2, 3), (4, 5), (6, 7), (8, 9),
+                (10, 11), (12, 13), (14, 15), (16, 17), (29, 30),
+            ]
+            frame = len(reg_pairs) * 16  # 160 bytes
+
+            # First STP pre-decrements SP by the whole frame (imm7 = -frame/8).
+            parts.extend(struct.pack("<I", _stp(0, 1, -(frame // 8), writeback=True)))
+            # Remaining pairs store at positive scaled offsets (slot * 2 in regs).
+            for i, (rt1, rt2) in enumerate(reg_pairs[1:], start=1):
+                parts.extend(struct.pack("<I", _stp(rt1, rt2, i * 2, writeback=False)))
+
+            # Load the 64-bit hook address into X16 via MOVZ/MOVK x4.
+            #   MOVZ X16, #imm16          base = 0xD2800010
+            #   MOVK X16, #imm16, LSL #16 base = 0xF2A00010
+            #   MOVK X16, #imm16, LSL #32 base = 0xF2C00010
+            #   MOVK X16, #imm16, LSL #48 base = 0xF2E00010
+            parts.extend(struct.pack("<I", 0xD2800010 | ((hook_addr & 0xFFFF) << 5)))
+            parts.extend(struct.pack("<I", 0xF2A00010 | (((hook_addr >> 16) & 0xFFFF) << 5)))
+            parts.extend(struct.pack("<I", 0xF2C00010 | (((hook_addr >> 32) & 0xFFFF) << 5)))
+            parts.extend(struct.pack("<I", 0xF2E00010 | (((hook_addr >> 48) & 0xFFFF) << 5)))
+
+            # BLR X16 -> call the hook (sets X30 = return).
+            parts.extend(struct.pack("<I", 0xD63F0200))
+
+            # Restore registers (reverse order; final LDP post-increments SP).
+            for i, (rt1, rt2) in enumerate(reg_pairs[1:], start=1):
+                parts.extend(struct.pack("<I", _ldp(rt1, rt2, i * 2, writeback=False)))
+            parts.extend(struct.pack("<I", _ldp(0, 1, frame // 8, writeback=True)))
+
+            # Execute stolen bytes verbatim.
+            parts.extend(stolen_bytes)
+
+            # Jump back to original function (after stolen bytes).
+            jmp_from = base_addr + len(parts)
+            jmp_back = self.generate_jump(jmp_from, return_addr)
+            parts.extend(jmp_back)
+
+        elif self._arch == "x86":
+            # Save general-purpose registers and flags.
+            parts.extend(b"\x60")           # pushad
+            parts.extend(b"\x9c")           # pushfd
+
+            # Call hook function.
+            parts.extend(b"\xb8" + struct.pack("<I", hook_addr))  # mov eax, hook_addr
+            parts.extend(b"\xff\xd0")                              # call eax
+
+            # Restore flags and registers.
+            parts.extend(b"\x9d")           # popfd
+            parts.extend(b"\x61")           # popad
+
+            # Execute stolen bytes.
+            parts.extend(stolen_bytes)
+
+            # Jump back to original function (after stolen bytes).
             jmp_from = base_addr + len(parts)
             jmp_back = self.generate_jump(jmp_from, return_addr)
             parts.extend(jmp_back)

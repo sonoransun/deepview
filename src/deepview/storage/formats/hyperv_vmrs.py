@@ -121,14 +121,17 @@ class HyperVVMRSLayer(DataLayer):
         if offset < 0 or offset >= self._bin_size:
             return b"\x00" * length if pad else b""
         end = min(offset + length, self._bin_size)
-        assert self._bin_mmap is not None
+        if self._bin_mmap is None:
+            return b"\x00" * length if pad else b""
         data = bytes(self._bin_mmap[offset:end])
         if pad and len(data) < length:
             data += b"\x00" * (length - len(data))
         return data
 
     def _read_gpadl(self, offset: int, length: int, *, pad: bool) -> bytes:
-        assert self._bin_mmap is not None
+        if self._bin_mmap is None:
+            # No backing map (empty .bin or closed layer): nothing to serve.
+            return b"\x00" * length if pad else b""
         out = bytearray()
         current = offset
         remaining = length

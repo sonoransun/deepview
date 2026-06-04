@@ -56,3 +56,45 @@ class TestDashboardApp:
         finally:
             bus.unsubscribe(sub)
         assert stats.events_received == 0
+        assert stats.events_dropped == 0
+
+    @pytest.mark.asyncio
+    async def test_run_with_no_subscriptions_terminates(self):
+        # With no event sources the loop has nothing to await; it must still
+        # honour the duration deadline rather than busy-spin forever.
+        spec = load_dashboard_config(layout="minimal")
+        app = DashboardApp(spec)
+        stats = await app.run(duration=0.2)
+        assert stats.events_received == 0
+
+    def test_render_frame_surfaces_subscription_drops(self):
+        # Drops are tracked per-subscription; render_frame must report the real
+        # total instead of a hardcoded zero.
+        spec = load_dashboard_config(layout="minimal")
+        app = DashboardApp(spec)
+        bus = TraceEventBus()
+        sub = bus.subscribe(queue_size=1)
+        # Overflow the queue to force drops on the subscription.
+        for _ in range(5):
+            bus.publish_sync(_event(syscall_name="read"))
+        assert sub.dropped_count == 4
+        # Simulate the run wiring: the app drains this subscription.
+        app._subscriptions = [sub]
+        assert app._dropped_total() == 4
+
+    @pytest.mark.asyncio
+    async def test_run_folds_final_drops_into_stats(self):
+        spec = load_dashboard_config(layout="minimal")
+        app = DashboardApp(spec)
+        bus = TraceEventBus()
+        sub = bus.subscribe(queue_size=1)
+        for _ in range(5):
+            bus.publish_sync(_event(syscall_name="read"))
+        assert sub.dropped_count == 4
+        try:
+            stats = await app.run(trace_subscription=sub, duration=0.2)
+        finally:
+            bus.unsubscribe(sub)
+        # The queued event is consumed; the 4 drops persist in the summary.
+        assert stats.events_received == 1
+        assert stats.events_dropped == 4

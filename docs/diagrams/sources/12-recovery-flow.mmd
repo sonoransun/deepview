@@ -1,0 +1,21 @@
+graph TD
+    Q{"What do you have?"}:::q
+    Q -->|"disk image, FS intact"| FS["Filesystem adapter<br/>list(include_deleted=True)"]:::cap
+    Q -->|"unallocated / no metadata"| CARVE["StringCarver + YARA<br/>signature carving"]:::cap
+    Q -->|"memory image"| VOL["memory/artifacts/*<br/>command_history · sockets · ns"]:::cap
+    Q -->|"encrypted volume"| KEY["EncryptionKeyScanner<br/>→ UnlockOrchestrator"]:::cap
+    Q -->|"raw NAND, bit-rot"| ECC["ECCDataLayer + FTL<br/>correct + remap"]:::cap
+    Q -->|"damaged partition table"| PART["MBR/GPT parser<br/>PartitionLayer"]:::cap
+    Q -->|"swap / hibernation"| SWAP["zram/zswap/swap +<br/>hibernation decoders"]:::cap
+
+    FS --> OUT["Recovered artifacts<br/>(ArtifactStore + report)"]:::out
+    CARVE --> OUT
+    VOL --> OUT
+    KEY --> OUT
+    ECC --> OUT
+    PART --> OUT
+    SWAP --> OUT
+
+    classDef q fill:#1a1a2e,color:#fff,stroke:#16213e;
+    classDef cap fill:#0f3460,color:#fff,stroke:#16213e;
+    classDef out fill:#16c79a,color:#000,stroke:#0f3460;

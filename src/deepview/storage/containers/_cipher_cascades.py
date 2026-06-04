@@ -31,6 +31,11 @@ def _aes_xts_decrypt(key: bytes, ciphertext: bytes) -> bytes:
     """
     if len(key) < 64:
         raise ValueError(f"AES-XTS header key must be >= 64 bytes, got {len(key)}")
+    if len(ciphertext) != _HEADER_CIPHERTEXT_LEN:
+        raise ValueError(
+            f"AES-XTS header ciphertext must be {_HEADER_CIPHERTEXT_LEN} bytes, "
+            f"got {len(ciphertext)}"
+        )
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
     tweak = (0).to_bytes(16, "little")
@@ -43,6 +48,11 @@ def _aes_xts_encrypt(key: bytes, plaintext: bytes) -> bytes:
     """Inverse of :func:`_aes_xts_decrypt`. Used by test fixtures."""
     if len(key) < 64:
         raise ValueError(f"AES-XTS header key must be >= 64 bytes, got {len(key)}")
+    if len(plaintext) != _HEADER_CIPHERTEXT_LEN:
+        raise ValueError(
+            f"AES-XTS header plaintext must be {_HEADER_CIPHERTEXT_LEN} bytes, "
+            f"got {len(plaintext)}"
+        )
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
     tweak = (0).to_bytes(16, "little")

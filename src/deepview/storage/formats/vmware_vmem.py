@@ -124,14 +124,17 @@ class VMwareVMEMLayer(DataLayer):
         if offset < 0 or offset >= self._size:
             return b"\x00" * length if pad else b""
         end = min(offset + length, self._size)
-        assert self._mmap is not None
+        if self._mmap is None:
+            return b"\x00" * length if pad else b""
         data = bytes(self._mmap[offset:end])
         if pad and len(data) < length:
             data += b"\x00" * (length - len(data))
         return data
 
     def _read_sparse(self, offset: int, length: int, *, pad: bool) -> bytes:
-        assert self._mmap is not None
+        if self._mmap is None:
+            # No backing map (empty file or closed layer): nothing to serve.
+            return b"\x00" * length if pad else b""
         out = bytearray()
         current = offset
         remaining = length

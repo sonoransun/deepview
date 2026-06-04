@@ -87,6 +87,20 @@ class TestJTAGRAMMultiRegion:
             assert layer.minimum_address == 0x08000000
             assert layer.maximum_address == 0x20000000 + 0x40 - 1
 
+    def test_multi_region_read_after_close(self, tmp_path: Path) -> None:
+        """A multi-region read with no backing mmap degrades gracefully.
+
+        Exercises the explicit None guard that replaced an ``assert`` in
+        ``_read_multi`` — under ``python -O`` the assert would be stripped and
+        the bare slice would crash, so this pins the total-function contract.
+        """
+        dump = self._build_two_region_dump(tmp_path)
+        layer = JTAGRAMLayer(dump)
+        assert layer.is_multi_region is True
+        layer.close()  # drops self._mmap to None
+        assert layer.read(0x20000000, 0x40) == b""
+        assert layer.read(0x20000000, 0x40, pad=True) == b"\x00" * 0x40
+
 
 class TestJTAGRAMMisc:
     def test_write_raises(self, tmp_path: Path) -> None:

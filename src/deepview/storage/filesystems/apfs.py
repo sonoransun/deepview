@@ -132,6 +132,7 @@ class APFSFilesystem(Filesystem):
         except Exception:
             pass
         snapshot = getattr(f, "snapshot_name", "") or ""
+        target = getattr(f, "symbolic_link_target", "") or ""
         return FSEntry(
             path=path,
             inode=int(getattr(f, "identifier", 0) or 0),
@@ -144,7 +145,8 @@ class APFSFilesystem(Filesystem):
             ctime=float(getattr(f, "inode_change_time_as_integer", 0) or 0) / 1e9,
             btime=(float(getattr(f, "creation_time_as_integer", 0) or 0) / 1e9) or None,
             is_dir=bool(getattr(f, "number_of_sub_file_entries", 0)),
-            is_symlink=bool(getattr(f, "symbolic_link_target", "") or ""),
+            is_symlink=bool(target),
+            target=target or None,
             extra={"fs": "apfs", "snapshot": snapshot, "extents": extents},
         )
 

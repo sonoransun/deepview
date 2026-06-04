@@ -47,6 +47,24 @@ class TestEMMCRaw:
         with EMMCRawLayer(dump) as layer:
             assert layer.has_gpt is True
 
+    def test_gpt_signature_detected_4k_block(self, tmp_path: Path) -> None:
+        """A 4 Kn dump carries its GPT header at LBA 1 == offset 4096."""
+        buf = bytearray(8192)
+        buf[4096:4104] = b"EFI PART"
+        dump = tmp_path / "gpt4k.img"
+        dump.write_bytes(bytes(buf))
+        with EMMCRawLayer(dump, block_size=4096) as layer:
+            assert layer.has_gpt is True
+
+    def test_gpt_not_detected_when_header_elsewhere(self, tmp_path: Path) -> None:
+        """Default 512 B probe must not false-positive on a 4 K-offset GPT."""
+        buf = bytearray(8192)
+        buf[4096:4104] = b"EFI PART"
+        dump = tmp_path / "gpt_misplaced.img"
+        dump.write_bytes(bytes(buf))
+        with EMMCRawLayer(dump) as layer:  # default block_size=512
+            assert layer.has_gpt is False
+
     def test_boot_offsets_when_large_enough(self, tmp_path: Path) -> None:
         size = 3 * 4 * 1024 * 1024
         dump = tmp_path / "big.img"

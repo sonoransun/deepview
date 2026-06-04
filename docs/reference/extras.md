@@ -25,7 +25,7 @@ missing extra print a yellow install-hint instead of blowing up.
 | `gpu` | `pycuda>=2022.1`, `pyopencl>=2022.1` | GPU-accelerated detection (`detection/*`), YARA-GPU. |
 | `ml` | `scikit-learn>=1.3`, `xgboost>=2.0` | ML-driven anomaly scoring (`detection/anomaly.py`). |
 | `sigma` | `pyyaml>=6.0` | Sigma-rule conversion for the classifier. |
-| `sidechannel` | `numpy>=1.24`, `scipy>=1.10` | SDR / ChipWhisperer side-channel pipelines. |
+| `sidechannel` | `numpy>=1.24`, `scipy>=1.10` | Side-channel analysis (PSD / leakage) for SDR / ChipWhisperer and rf-SQUID / dc-SQUID magnetometry. |
 | `disassembly` | `capstone>=5.0`, `pyhidra>=1.0` | `deepview disassemble` (Capstone + Ghidra via pyhidra). |
 | `storage` | `pytsk3`, `pyfsapfs`, `pyfsntfs`, `pyfsxfs`, `pyfsbtrfs`, `pyfsf2fs`, `pyfshfs`, `pyfsext` | Full native + TSK filesystem adapter stack for `deepview filesystem`, `storage`. |
 | `compression` | `zstandard>=0.22`, `lz4>=4.3`, `python-lzo>=1.15` | Swap / zram / zswap / filesystem-compression decoders. |
@@ -218,7 +218,11 @@ Smaller specialty extras:
 - `ml`: `scikit-learn` + `xgboost` for `detection/anomaly.py`.
 - `sigma`: `pyyaml` (already core) — reserved for future Sigma rule
   import paths.
-- `sidechannel`: `numpy` + `scipy` for SDR / ChipWhisperer pipelines.
+- `sidechannel`: `numpy` + `scipy` for the side-channel analysis helpers
+  (PSD, correlation, leakage SNR). Powers SDR / ChipWhisperer pipelines and
+  the rf-SQUID / dc-SQUID magnetometry probes (`deepview sidechannel`); the
+  capture path and the simulated probe are stdlib-only, so only *analysis*
+  needs the extra. See [Side-channel (SQUID)](../architecture/sidechannel.md).
 - `firmware`: `chipsec` + `uefi-firmware` for UEFI / SPI analysis.
 - `hardware`: `leechcore` for DMA acquisition via LeechCore.
 

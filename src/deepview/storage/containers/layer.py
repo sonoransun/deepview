@@ -61,7 +61,8 @@ class DecryptedVolumeLayer(DataLayer):
     mode:
         Block-cipher mode. ``"xts"`` covers LUKS2 / VeraCrypt / BitLocker;
         ``"cbc-essiv"`` / ``"cbc-plain64"`` cover legacy LUKS1 /
-        dm-crypt; ``"ctr"`` is reserved for FileVault2 and similar.
+        dm-crypt; ``"ctr"`` covers per-sector AES-CTR (the nonce is reset
+        to the sector number at every sector boundary).
     iv_mode:
         IV derivation. ``"plain64"`` is the sector number rendered as
         little-endian 8 bytes padded to the cipher block. ``"tweak"`` is
@@ -129,16 +130,14 @@ class DecryptedVolumeLayer(DataLayer):
         if length == 0:
             return b""
 
-        # Lazy import so core installs without the `containers` extra can
-        # still import this module.
-        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-
         end = offset + length
         if offset < 0 or end > self._data_length:
             if pad:
                 clamped_start = max(offset, 0)
                 clamped_end = min(end, self._data_length)
                 if clamped_start >= clamped_end:
+                    # Entirely outside the plaintext range — no ciphertext to
+                    # decrypt, so skip the crypto import altogether.
                     return b"\x00" * length
                 inner = self.read(clamped_start, clamped_end - clamped_start, pad=False)
                 head = b"\x00" * max(0, -offset)
@@ -148,6 +147,11 @@ class DecryptedVolumeLayer(DataLayer):
                 f"read out of bounds: offset={offset} length={length} "
                 f"data_length={self._data_length}"
             )
+
+        # Lazy import so core installs without the `containers` extra can
+        # still import this module; only needed once we know real
+        # ciphertext must be decrypted.
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
         first_sector = offset // self._sector_size
         last_sector = (end - 1) // self._sector_size

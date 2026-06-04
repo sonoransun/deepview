@@ -43,6 +43,12 @@ def test_rs_clean_roundtrip(codec: ReedSolomonDecoder) -> None:
     assert result.uncorrectable is False
 
 
+def test_rs_uses_accelerated_backend(codec: ReedSolomonDecoder) -> None:
+    """With reedsolo installed (this module is importorskip-gated on it), the
+    decoder selects the accelerated codec, not the pure-Python fallback."""
+    assert codec._reedsolo is not None
+
+
 @pytest.mark.parametrize("flips", [1, 4, 8])
 def test_rs_corrects_up_to_eight_byte_errors(
     codec: ReedSolomonDecoder, flips: int

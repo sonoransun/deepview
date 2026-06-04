@@ -29,6 +29,7 @@ class DashboardStats:
     started_ns: int = 0
     last_ns: int = 0
     events_received: int = 0
+    events_dropped: int = 0
 
 
 class DashboardApp:
@@ -51,6 +52,7 @@ class DashboardApp:
         self._layout = DashboardLayout(spec, self._panels)
         self._stats = DashboardStats()
         self._stopped: asyncio.Event | None = None
+        self._subscriptions: list[EventSubscription] = []
 
     @property
     def panels(self) -> list[Panel]:
@@ -89,12 +91,21 @@ class DashboardApp:
             except Exception as e:  # noqa: BLE001
                 log.warning("panel_tick_error", name=panel.name, error=str(e))
 
+    def _dropped_total(self) -> int:
+        """Sum the drop counters of every subscription this run is draining,
+        plus any drops already folded into the stats. Subscriptions silently
+        discard events on queue overflow, so the dashboard must surface this
+        rather than report a hardcoded zero."""
+        return self._stats.events_dropped + sum(
+            sub.dropped_count for sub in self._subscriptions
+        )
+
     def render_frame(self) -> object:
         frame = FrameState(
             now_ns=time.time_ns(),
             started_ns=self._stats.started_ns,
             events_received=self._stats.events_received,
-            events_dropped=0,
+            events_dropped=self._dropped_total(),
         )
         return self._layout.render(frame)
 
@@ -113,6 +124,14 @@ class DashboardApp:
         :class:`LiveRenderer` uses.
         """
         self._stopped = asyncio.Event()
+        # Drops are accumulated live from the subscriptions during the run;
+        # reset the folded counter so a second run() does not double-count.
+        self._stats.events_dropped = 0
+        self._subscriptions = [
+            sub
+            for sub in (trace_subscription, classified_subscription)
+            if sub is not None
+        ]
         loop = asyncio.get_running_loop()
         try:
             loop.add_signal_handler(signal.SIGINT, self._stopped.set)
@@ -145,6 +164,10 @@ class DashboardApp:
                     event = await classified_subscription.get(timeout=0.05)
                     if event is not None:
                         self.dispatch_classified(event)
+                if trace_subscription is None and classified_subscription is None:
+                    # No event sources: the loop has nothing to await, so yield
+                    # to the event loop instead of busy-spinning a CPU core.
+                    await asyncio.sleep(0.05)
                 # Periodic tick + frame.
                 now = loop.time()
                 if now >= next_tick:
@@ -157,6 +180,10 @@ class DashboardApp:
             loop.remove_signal_handler(signal.SIGTERM)
         except (NotImplementedError, RuntimeError):
             pass
+        # Fold the final per-subscription drop counts into the stats so the
+        # returned summary stays accurate after the subscriptions are gone.
+        self._stats.events_dropped = self._dropped_total()
+        self._subscriptions = []
         return self._stats
 
     def request_stop(self) -> None:

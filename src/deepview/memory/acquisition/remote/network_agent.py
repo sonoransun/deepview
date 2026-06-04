@@ -1,16 +1,28 @@
 """Remote memory acquisition via a pre-deployed Deep View agent.
 
-This is the "interim transport" used until the gRPC stubs are generated
-from ``deepview_agent.proto``. We keep the shape of a gRPC client —
-lazy-import :mod:`grpc` purely to gate :meth:`is_available` — but the
-actual wire is a minimal framed-TCP protocol: an 8-byte magic + 1-byte
-version handshake, followed by length-prefixed chunks
-(``!I`` big-endian, 0 = EOF). TLS is provided by :mod:`ssl` with a CA
-bundle supplied in ``endpoint.tls_ca``.
+Two wire protocols share one public :class:`NetworkAgentProvider` API:
 
-The framed protocol is intentionally boring: the moment the ``.proto``
-and generated stubs land, this file swaps to a proper gRPC client and
-the public :class:`NetworkAgentProvider` API stays unchanged.
+- **gRPC/TLS** (preferred) — the ``DeepViewAgent.Acquire`` server-stream
+  defined in ``deepview_agent.proto``. This path is used *only* when both
+  :mod:`grpc` and the generated ``deepview_agent_pb2`` /
+  ``deepview_agent_pb2_grpc`` stubs import. The generated stubs are not
+  committed; build them where ``grpcio-tools`` is present with::
+
+      python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. \\
+          deepview_agent.proto
+
+- **Framed-TCP** (interim default + fallback) — a minimal protocol used
+  whenever the gRPC stubs are absent: an 8-byte magic + 1-byte version
+  handshake, followed by length-prefixed chunks (``!I`` big-endian,
+  0 = EOF). TLS is provided by :mod:`ssl` with a CA bundle supplied in
+  ``endpoint.tls_ca``.
+
+:meth:`NetworkAgentProvider.acquire` keeps identical behaviour by default
+(framed-TCP); it routes to the gRPC path only when
+:func:`_grpc_stubs_available` confirms both :mod:`grpc` and the generated
+stubs can be imported. The public API — ``provider_name`` /
+``transport_name`` / ``acquire`` / the emitted events / the
+:class:`AcquisitionResult` shape — is the same on either path.
 """
 from __future__ import annotations
 
@@ -66,7 +78,7 @@ class NetworkAgentProvider(RemoteAcquisitionProvider):
         # check advertises the preferred transport for parity with the
         # other providers' optional-dep gating.
         try:
-            import grpc  # noqa: F401
+            import grpc  # type: ignore[import-untyped]  # noqa: F401
         except Exception:  # noqa: BLE001
             return False
         return True
@@ -97,6 +109,23 @@ class NetworkAgentProvider(RemoteAcquisitionProvider):
         target: AcquisitionTarget,
         output: Path,
         fmt: DumpFormat = DumpFormat.RAW,
+    ) -> AcquisitionResult:
+        # Prefer the real gRPC transport, but ONLY when both grpc and the
+        # generated stubs import. Absence of either => framed-TCP fallback,
+        # so the default behaviour is unchanged on a core install.
+        if _grpc_stubs_available():
+            try:
+                return self._acquire_grpc(target, output, fmt)
+            except _StubsUnavailable:
+                # Lost the race / partial stubs: degrade to framed-TCP.
+                log.info("network_agent_grpc_unavailable_fallback", host=self.endpoint.host)
+        return self._acquire_framed_tcp(target, output, fmt)
+
+    def _acquire_framed_tcp(
+        self,
+        target: AcquisitionTarget,
+        output: Path,
+        fmt: DumpFormat,
     ) -> AcquisitionResult:
         port = self.endpoint.port or 9443
         start = time.time()
@@ -170,6 +199,135 @@ class NetworkAgentProvider(RemoteAcquisitionProvider):
             duration_seconds=elapsed,
             hash_sha256=digest,
         )
+
+    def _acquire_grpc(
+        self,
+        target: AcquisitionTarget,
+        output: Path,
+        fmt: DumpFormat,
+    ) -> AcquisitionResult:
+        """Acquire over the real gRPC/TLS ``DeepViewAgent.Acquire`` stream.
+
+        Lazily imports :mod:`grpc` and the generated stubs. If the generated
+        ``deepview_agent_pb2`` / ``deepview_agent_pb2_grpc`` modules are
+        absent, raises :class:`_StubsUnavailable` so :meth:`acquire` falls
+        back to the framed-TCP path. The emitted events, SHA256 hashing, and
+        :class:`AcquisitionResult` shape match the framed-TCP path exactly.
+        """
+        try:
+            import grpc
+        except Exception as exc:  # noqa: BLE001
+            raise _StubsUnavailable("grpc is not importable") from exc
+        try:
+            from deepview.memory.acquisition.remote import (  # type: ignore[attr-defined]
+                deepview_agent_pb2 as pb2,
+            )
+            from deepview.memory.acquisition.remote import (  # type: ignore[attr-defined]
+                deepview_agent_pb2_grpc as pb2_grpc,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise _StubsUnavailable(
+                "network-agent: gRPC stubs not generated — run "
+                "`python -m grpc_tools.protoc -I. --python_out=. "
+                "--grpc_python_out=. deepview_agent.proto` next to "
+                "deepview_agent.proto (in "
+                "deepview/memory/acquisition/remote/) to enable the gRPC "
+                "transport"
+            ) from exc
+
+        port = self.endpoint.port or 9443
+        target_addr = f"{self.endpoint.host}:{port}"
+        start = time.time()
+
+        self._context.events.publish(
+            RemoteAcquisitionStartedEvent(
+                endpoint=self.endpoint.host,
+                transport=self.transport_name(),
+                output=str(output),
+            )
+        )
+
+        ssl_ctx = self._build_ssl_context()
+        if ssl_ctx is not None:
+            if self.endpoint.tls_ca is None:
+                raise AcquisitionError(
+                    "network-agent: require_tls=True but no tls_ca file provided — aborting"
+                )
+            root_certs = Path(self.endpoint.tls_ca).read_bytes()
+            creds = grpc.ssl_channel_credentials(root_certificates=root_certs)
+            channel = grpc.secure_channel(target_addr, creds)
+        else:
+            channel = grpc.insecure_channel(target_addr)
+
+        size_bytes = 0
+        try:
+            stub = pb2_grpc.DeepViewAgentStub(channel)
+            request = pb2.AcquireRequest(format=fmt.value)
+
+            log.info("network_agent_grpc_streaming", host=self.endpoint.host, port=port)
+
+            with open(output, "wb") as dst:
+                for chunk in stub.Acquire(request):
+                    data = chunk.data
+                    if not data:
+                        continue
+                    dst.write(data)
+                    size_bytes += len(data)
+                    self._emit_progress(size_bytes, 0, stage="stream")
+        finally:
+            try:
+                channel.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+        self._emit_progress(size_bytes, size_bytes, stage="hashing")
+        digest = hash_file(output)
+        elapsed = time.time() - start
+        self._context.events.publish(
+            RemoteAcquisitionCompletedEvent(
+                endpoint=self.endpoint.host,
+                output=str(output),
+                size_bytes=size_bytes,
+                elapsed_s=elapsed,
+            )
+        )
+        return AcquisitionResult(
+            success=True,
+            output_path=output,
+            format=fmt,
+            size_bytes=size_bytes,
+            duration_seconds=elapsed,
+            hash_sha256=digest,
+        )
+
+
+class _StubsUnavailable(RuntimeError):
+    """Internal signal: grpc and/or generated stubs are not importable.
+
+    Raised inside :meth:`NetworkAgentProvider._acquire_grpc` so that
+    :meth:`NetworkAgentProvider.acquire` can cleanly fall back to the
+    framed-TCP transport. Not part of the public API.
+    """
+
+
+def _grpc_stubs_available() -> bool:
+    """Return ``True`` iff both :mod:`grpc` and the generated stubs import.
+
+    The generated ``deepview_agent_pb2`` / ``deepview_agent_pb2_grpc``
+    modules are not committed to the tree; they're built on demand where
+    ``grpcio-tools`` is present. When either the runtime or the stubs are
+    missing, :meth:`NetworkAgentProvider.acquire` uses the framed-TCP path.
+    """
+    try:
+        import grpc  # noqa: F401
+
+        from deepview.memory.acquisition.remote import (  # type: ignore[attr-defined]  # noqa: F401
+            deepview_agent_pb2,
+            deepview_agent_pb2_grpc,
+        )
+    except Exception:  # noqa: BLE001
+        return False
+    return True
 
 
 def _recv_exact(sock: socket.socket, n: int) -> bytes:

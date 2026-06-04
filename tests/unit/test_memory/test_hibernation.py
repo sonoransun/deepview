@@ -67,6 +67,30 @@ class TestHibernationMagic:
         with pytest.raises(FormatError):
             HibernationLayer(bad)
 
+    def test_rejects_empty_file(self, tmp_path: Path) -> None:
+        # A zero-length file cannot be mmap'd; the layer must surface a clean
+        # FormatError rather than letting mmap's bare ValueError escape.
+        empty = tmp_path / "empty.sys"
+        empty.write_bytes(b"")
+        with pytest.raises(FormatError):
+            HibernationLayer(empty)
+
+    def test_rejects_too_small_file(self, tmp_path: Path) -> None:
+        tiny = tmp_path / "tiny.sys"
+        tiny.write_bytes(b"hi")  # < 4 bytes, no room for a magic
+        with pytest.raises(FormatError):
+            HibernationLayer(tiny)
+
+    def test_failed_construction_leaks_no_handle(self, tmp_path: Path) -> None:
+        # Repeatedly constructing on a bad-magic file must not leak file
+        # descriptors / mmaps — if it did, this loop would eventually raise
+        # "Too many open files".
+        bad = tmp_path / "bad.sys"
+        bad.write_bytes(b"XXXX" + b"\x00" * 0x1000)
+        for _ in range(200):
+            with pytest.raises(FormatError):
+                HibernationLayer(bad)
+
     def test_accepts_hibr_lower(self, tmp_path: Path) -> None:
         p = tmp_path / "h.sys"
         _build_minimal_hiberfil(p, magic=b"hibr")
@@ -162,3 +186,75 @@ class TestHibernationLifecycle:
         layer = HibernationLayer(p)
         layer.read(0, 4)
         del layer  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# Malformed range-table handling (table-walk error paths)
+# ---------------------------------------------------------------------------
+
+
+def _build_hiberfil_with_giant_run(path: Path, page_size: int = 0x1000) -> None:
+    """Write a hiberfil whose first range table claims an absurd run.
+
+    The first table page (page 1) declares a single range covering far more
+    pages than the file could ever hold. A naive walk would iterate billions
+    of times; the parser must reject the run and fall back to raw mode.
+    """
+    total_pages = 4
+    header = bytearray(page_size)
+    header[0:4] = b"hibr"
+    struct.pack_into("<I", header, 0x18, page_size)  # PageSize
+    struct.pack_into("<I", header, 0x4C, total_pages)  # TotalPages
+    struct.pack_into("<Q", header, 0x58, 1)  # FirstTablePage
+    struct.pack_into("<Q", header, 0x60, total_pages + 1)  # LastFilePage
+
+    body = bytearray()
+    # Page 1: a range table with one range whose EndPage is enormous.
+    table = bytearray(page_size)
+    struct.pack_into("<I", table, 0x0, 1)  # PageCount (one range)
+    struct.pack_into("<I", table, 0x4, 0)  # _pad
+    struct.pack_into("<Q", table, 0x8, 0)  # NextTable -> 0 terminates
+    # MemoryRange { StartPage=0; EndPage=2**60 } -> impossible run length.
+    struct.pack_into("<Q", table, 0x10, 0)
+    struct.pack_into("<Q", table, 0x18, 1 << 60)
+    body.extend(table)
+    # A couple of trailing filler pages so the file has a body to read.
+    for i in range(total_pages):
+        body.extend(bytes([i & 0xFF]) * page_size)
+
+    path.write_bytes(bytes(header) + bytes(body))
+
+
+class TestHibernationMalformedTables:
+    def test_giant_run_does_not_hang_and_falls_back(self, tmp_path: Path) -> None:
+        p = tmp_path / "giant.sys"
+        _build_hiberfil_with_giant_run(p)
+        # If the run guard is missing this construction never returns; the
+        # test simply completing proves the run was rejected. The layer must
+        # degrade to raw pass-through rather than blowing up.
+        layer = HibernationLayer(p)
+        try:
+            assert layer.compression_status == "undecoded"
+            # Raw mode still serves the header bytes verbatim.
+            assert layer.read(0, 4) == b"hibr"
+        finally:
+            layer.close()
+
+    def test_truncated_table_header_falls_back(self, tmp_path: Path) -> None:
+        # FirstTablePage points past EOF -> table_off + header overruns the
+        # file; the walk must break cleanly and serve raw bytes.
+        page_size = 0x1000
+        header = bytearray(page_size)
+        header[0:4] = b"hibr"
+        struct.pack_into("<I", header, 0x18, page_size)  # PageSize
+        struct.pack_into("<I", header, 0x4C, 4)  # TotalPages
+        struct.pack_into("<Q", header, 0x58, 999)  # FirstTablePage past EOF
+        struct.pack_into("<Q", header, 0x60, 5)  # LastFilePage
+        p = tmp_path / "trunc.sys"
+        p.write_bytes(bytes(header) + b"\x00" * page_size)
+        layer = HibernationLayer(p)
+        try:
+            assert layer.compression_status == "undecoded"
+            assert layer.read(0, 4) == b"hibr"
+        finally:
+            layer.close()

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import mmap
-import struct
 from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -18,6 +17,12 @@ class RawMemoryLayer(DataLayer):
     """Raw flat memory dump. The file is a byte-for-byte image of physical memory."""
 
     def __init__(self, path: Path, name: str = ""):
+        # Initialise the handles first so that close()/__del__ stay safe even
+        # if stat()/open()/mmap() below raises mid-construction (an empty dump
+        # makes mmap() raise ValueError) — otherwise the GC'd partial object
+        # hits AttributeError and leaks the file descriptor.
+        self._mmap: mmap.mmap | None = None
+        self._file = None
         self._path = path
         self._name = name or path.name
         self._size = path.stat().st_size

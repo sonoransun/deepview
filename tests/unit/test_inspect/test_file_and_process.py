@@ -66,3 +66,35 @@ class TestLiveProcessLayer:
         assert regions
         assert layer.minimum_address <= layer.maximum_address
         layer.close()
+
+    def test_find_region_and_is_valid(self):
+        from deepview.inspect.live_layer import LiveProcessLayer
+
+        layer = LiveProcessLayer(os.getpid())
+        try:
+            region = layer.regions[0]
+            # A mapped address resolves to its region; is_valid agrees.
+            assert layer._find_region(region.start) is region
+            assert layer.is_valid(region.start, 1) is True
+            # An almost-certainly-unmapped low address resolves to nothing.
+            assert layer._find_region(0x1) is None
+            assert layer.is_valid(0x1, 1) is False
+        finally:
+            layer.close()
+
+    def test_read_padding_and_unmapped(self):
+        from deepview.core.exceptions import LayerError
+        from deepview.inspect.live_layer import LiveProcessLayer
+
+        layer = LiveProcessLayer(os.getpid())
+        try:
+            region = layer.regions[0]
+            # Mapped read with pad always yields the requested length (the
+            # kernel may still refuse the actual bytes, hence pad).
+            assert len(layer.read(region.start, 16, pad=True)) == 16
+            # Unmapped read pads to zeros, or raises without pad.
+            assert layer.read(0x1, 16, pad=True) == b"\x00" * 16
+            with pytest.raises(LayerError):
+                layer.read(0x1, 16)
+        finally:
+            layer.close()

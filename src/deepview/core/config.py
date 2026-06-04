@@ -53,6 +53,12 @@ class SideChannelConfig(BaseSettings):
     sdr_device: str = ""
     chipwhisperer_serial: str = ""
     sample_rate_hz: int = 20_000_000
+    # rf-SQUID / dc-SQUID magnetometer probe settings.
+    squid_driver: str = "squidpy"
+    squid_device: str = ""
+    squid_flux_bias: float = 0.0
+    squid_rf_bias_hz: float = 20_000_000.0
+    squid_gain: float = 1.0
 
 
 class ClassificationConfig(BaseSettings):

@@ -1,0 +1,38 @@
+// Deep View remote memory acquisition agent — gRPC service definition.
+//
+// This is the *eventual* wire protocol for NetworkAgentProvider. The
+// interim transport (see network_agent.py) is a framed-TCP shim that
+// stays the default until the generated stubs are present.
+//
+// Generated stubs are intentionally NOT committed to the tree — they are
+// built on demand wherever grpcio-tools is installed, with:
+//
+//     python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. deepview_agent.proto
+//
+// That produces deepview_agent_pb2.py + deepview_agent_pb2_grpc.py next
+// to this file; network_agent._grpc_stubs_available() detects them and
+// routes acquire() to the gRPC path. Absent stubs => framed-TCP fallback.
+
+syntax = "proto3";
+
+package deepview.agent.v1;
+
+// Streaming memory-acquisition service exposed by the pre-deployed agent.
+service DeepViewAgent {
+  // Acquire streams the target's memory image back to the client as a
+  // sequence of chunks; the stream completes when the agent has sent the
+  // full image (an empty trailing chunk is not required — stream end is
+  // signalled by gRPC's normal half-close).
+  rpc Acquire(AcquireRequest) returns (stream AcquireChunk);
+}
+
+// Request to begin an acquisition. The format selector mirrors the
+// DumpFormat values understood by the provider (e.g. "raw").
+message AcquireRequest {
+  string format = 1;
+}
+
+// A single chunk of acquired memory bytes.
+message AcquireChunk {
+  bytes data = 1;
+}

@@ -1,0 +1,22 @@
+graph LR
+    SUT["Subject under test<br/>(SubjectUnderTest)"]:::sut
+    P{{"SideChannelProbe<br/>dc-squid / rf-squid / simulated"}}:::probe
+    M["SideChannelManager.capture()"]:::mgr
+    C["ProbeCapture<br/>samples + sample_rate + SHA256"]:::cap
+    EV["EventBus<br/>SideChannelCapture* events"]:::event
+    AR["ArtifactStore<br/>sidechannel_captures"]:::store
+    AN["analysis<br/>PSD / correlation / leakage SNR"]:::analysis
+
+    SUT --> P --> M
+    M --> C
+    M --> EV
+    M --> AR
+    C --> AN
+
+    classDef sut fill:#1a1a2e,color:#fff,stroke:#16213e;
+    classDef probe fill:#0f3460,color:#fff,stroke:#16213e;
+    classDef mgr fill:#16213e,color:#fff,stroke:#0f3460;
+    classDef cap fill:#533483,color:#fff,stroke:#0f3460;
+    classDef event fill:#e94560,color:#fff,stroke:#16213e;
+    classDef store fill:#0f3460,color:#fff,stroke:#16213e;
+    classDef analysis fill:#16c79a,color:#000,stroke:#0f3460;

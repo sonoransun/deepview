@@ -112,11 +112,17 @@ class NTFSFilesystem(Filesystem):
         return out
 
     def _to_entry(self, path: str, f: Any) -> FSEntry:
+        # libfsntfs surfaces a reparse-point symlink/mount-point target via
+        # ``symbolic_link_target`` (empty/absent for plain files and dirs).
+        target = getattr(f, "symbolic_link_target", "") or ""
+        reparse_tag = int(getattr(f, "reparse_point_tag", 0) or 0)
         extra: dict[str, Any] = {
             "fs": "ntfs_native",
             "ads": self._ads(f),
             "mft_record": int(getattr(f, "file_reference", 0) or 0),
         }
+        if reparse_tag:
+            extra["reparse_point_tag"] = reparse_tag
         return FSEntry(
             path=path,
             inode=int(getattr(f, "file_reference", 0) or 0),
@@ -129,7 +135,8 @@ class NTFSFilesystem(Filesystem):
             ctime=float(getattr(f, "entry_modification_time_as_integer", 0) or 0) / 1e7,
             btime=(float(getattr(f, "creation_time_as_integer", 0) or 0) / 1e7) or None,
             is_dir=bool(getattr(f, "number_of_sub_file_entries", 0)),
-            is_symlink=False,
+            is_symlink=bool(target),
+            target=target or None,
             extra=extra,
         )
 

@@ -103,8 +103,11 @@ class HibernationLayer(DataLayer):
         self._path = path
         self._name = name or "hibernation"
         self._size = path.stat().st_size
-        self._file = open(path, "rb")
-        self._mmap = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        # ``mmap`` cannot map a zero-length file and raises a bare
+        # ``ValueError``; surface a clean ``FormatError`` instead and reject
+        # before opening any handle (an empty file can never hold a header).
+        if self._size < 4:
+            raise FormatError("Hibernation file too small")
 
         # Header fields. Defaults are conservative fallbacks.
         self._page_size = 0x1000
@@ -121,8 +124,17 @@ class HibernationLayer(DataLayer):
 
         self.compression_status = "undecoded"
 
-        self._validate_magic()
-        self._parse_header()
+        # Any failure before construction completes must not leak the file
+        # handle or mmap — close them and re-raise.
+        try:
+            self._file = open(path, "rb")
+            self._mmap = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+            self._validate_magic()
+            self._parse_header()
+        except Exception:
+            self.close()
+            raise
+
         # Best-effort table walk. Any failure drops us to fallback mode.
         try:
             self._parse_tables()
@@ -139,6 +151,8 @@ class HibernationLayer(DataLayer):
     # ------------------------------------------------------------------
 
     def _validate_magic(self) -> None:
+        # __init__ already rejects files shorter than 4 bytes before opening
+        # the mmap; this is a defensive belt-and-braces guard.
         if self._size < 4:
             raise FormatError("Hibernation file too small")
         magic = bytes(self._mmap[:4])
@@ -214,17 +228,25 @@ class HibernationLayer(DataLayer):
                 if end_page < start_page:
                     continue
                 run_pages = end_page - start_page + 1
+                # A corrupted range can claim a run far larger than the file
+                # could possibly hold. Reject any run whose pages cannot fit in
+                # the file rather than iterating billions of times below.
+                if run_pages > file_pages:
+                    break
                 # Compressed size is unknown from the header alone; we assume
                 # the block is aligned to the next page boundary. Concretely
                 # we record (cursor, run_pages * page_size) and let the
                 # Xpress decoder size-check on decode.
                 compressed_span = run_pages * self._page_size
-                if cursor + 1 > self._size:
+                # No compressed bytes remain in the file for this run.
+                if cursor >= self._size:
                     break
                 for j in range(run_pages):
                     pfn = start_page + j
                     file_offset = cursor + j * self._page_size
-                    if pfn >= file_pages:
+                    # The compressed bytes for this page must lie within the
+                    # file; skip pages whose PFN or file offset run past EOF.
+                    if pfn >= file_pages or file_offset >= self._size:
                         continue
                     self._page_map[pfn] = (file_offset, self._page_size)
                 cursor += compressed_span
@@ -378,15 +400,20 @@ class HibernationLayer(DataLayer):
     # ------------------------------------------------------------------
 
     def close(self) -> None:
-        try:
-            if self._mmap is not None:
-                self._mmap.close()
-        except (ValueError, BufferError):
-            pass
-        self._mmap = None  # type: ignore[assignment]
-        if self._file is not None:
+        # Tolerate being called before __init__ finished wiring up the
+        # handles (e.g. when mmap() raised mid-construction), so a failed
+        # construction never leaks the file descriptor.
+        mm = getattr(self, "_mmap", None)
+        if mm is not None:
             try:
-                self._file.close()
+                mm.close()
+            except (ValueError, BufferError):
+                pass
+            self._mmap = None  # type: ignore[assignment]
+        fh = getattr(self, "_file", None)
+        if fh is not None:
+            try:
+                fh.close()
             except Exception:
                 pass
             self._file = None  # type: ignore[assignment]

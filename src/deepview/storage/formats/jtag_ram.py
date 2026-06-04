@@ -153,7 +153,9 @@ class JTAGRAMLayer(DataLayer):
         return data
 
     def _read_multi(self, offset: int, length: int, *, pad: bool) -> bytes:
-        assert self._mmap is not None
+        if self._mmap is None:
+            # No backing map (empty file or closed layer): nothing to serve.
+            return b"\x00" * length if pad else b""
         out = bytearray()
         current = offset
         remaining = length

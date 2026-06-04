@@ -155,8 +155,8 @@ class LiMERemoteProvider(RemoteAcquisitionProvider):
 
         if self.endpoint.known_hosts is None:
             raise AcquisitionError(
-                "remote-lime refuses to connect without --known-hosts: "
-                "TOFU is disabled for security"
+                "remote-lime refuses to connect without a known_hosts file "
+                "(--known-hosts): TOFU is disabled for security"
             )
         kh_path = Path(self.endpoint.known_hosts)
         if not kh_path.exists():

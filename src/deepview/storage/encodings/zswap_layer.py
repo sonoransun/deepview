@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Literal
 
 from deepview.core.types import LayerMetadata, ScanResult
 from deepview.interfaces.layer import DataLayer
+from deepview.storage.encodings._codecs import codec_missing
 
 if TYPE_CHECKING:
     from deepview.interfaces.scanner import PatternScanner
@@ -74,16 +75,25 @@ class ZswapLayer(DataLayer):
             return b"\x00" * self._page_size
 
         if self._algo == "lz4":
-            import lz4.block  # type: ignore[import-not-found]
+            try:
+                import lz4.block  # type: ignore[import-not-found]
+            except ImportError as exc:
+                raise codec_missing("lz4") from exc
 
             out = lz4.block.decompress(blob, uncompressed_size=self._page_size)
         elif self._algo == "zstd":
-            import zstandard  # type: ignore[import-not-found]
+            try:
+                import zstandard  # type: ignore[import-not-found]
+            except ImportError as exc:
+                raise codec_missing("zstd") from exc
 
             dctx = zstandard.ZstdDecompressor()
             out = dctx.decompress(blob, max_output_size=self._page_size)
         elif self._algo == "lzo":
-            import lzo  # type: ignore[import-not-found]
+            try:
+                import lzo  # type: ignore[import-not-found]
+            except ImportError as exc:
+                raise codec_missing("lzo") from exc
 
             out = lzo.decompress(blob, False, self._page_size)
         elif self._algo == "deflate":

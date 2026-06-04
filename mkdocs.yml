@@ -100,6 +100,7 @@ nav:
       - Container unlock: architecture/containers.md
       - Remote acquisition: architecture/remote-acquisition.md
       - Tracing & classification: architecture/tracing-and-classification.md
+      - Side-channel (SQUID): architecture/sidechannel.md
   - Guides:
       - Storage image walkthrough: guides/storage-image-walkthrough.md
       - Unlock a LUKS volume: guides/unlock-luks-volume.md
@@ -107,6 +108,7 @@ nav:
       - Remote acquire over SSH: guides/remote-acquire-ssh.md
       - Remote acquire over DMA: guides/remote-acquire-dma.md
       - Offload a PBKDF2 job: guides/offload-pbkdf2.md
+      - Recovering artifacts: guides/recover-artifacts.md
       - Extending Deep View: guides/extending-deepview.md
   - Reference:
       - CLI: reference/cli.md

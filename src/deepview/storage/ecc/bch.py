@@ -100,26 +100,35 @@ class BCHDecoder(ECCDecoder):
         self._galois_bch: Any | None = None
         self._tiny: _TinyBCH74 | None = None
 
-        try:
-            import galois  # type: ignore[import-not-found]
-
-            self._galois_bch = galois.BCH(2**m - 1, d=2 * t + 1)
-            n = int(self._galois_bch.n)
-            k = int(self._galois_bch.k)
-            self.ecc_bytes = ((n - k) + 7) // 8
-            if data_chunk * 8 > k:
-                raise ValueError(
-                    f"data_chunk={data_chunk} bytes exceeds BCH message "
-                    f"capacity {k} bits for t={t}, m={m}"
-                )
-        except ImportError:
-            if (t, m, data_chunk) != (1, 3, 1):
-                raise RuntimeError(
-                    "BCHDecoder fallback only supports (t=1, m=3, data_chunk=1); "
-                    "install the 'galois' package for other parameters"
-                ) from None
+        # The (t=1, m=3, data_chunk=1) combination is the degenerate BCH(7,4)
+        # "tiny" code: it protects the low nibble of a single byte. Its 1-byte
+        # data chunk cannot be expressed under the galois capacity model
+        # (k=4 bits < 8 bits), so this combination ALWAYS uses the hard-coded
+        # tiny codec — regardless of whether `galois` is installed — so the
+        # behaviour is identical with and without the accelerator.
+        if (t, m, data_chunk) == (1, 3, 1):
             self._tiny = _TinyBCH74()
             self.ecc_bytes = 1
+            return
+
+        try:
+            import galois  # type: ignore[import-not-found]
+        except ImportError:
+            raise RuntimeError(
+                f"BCH (t={t}, m={m}, data_chunk={data_chunk}) requires the 'galois' "
+                "accelerator — pip install 'deepview[ecc]'. Only the degenerate "
+                "(t=1, m=3, data_chunk=1) code works without it."
+            ) from None
+
+        self._galois_bch = galois.BCH(2**m - 1, d=2 * t + 1)
+        n = int(self._galois_bch.n)
+        k = int(self._galois_bch.k)
+        self.ecc_bytes = ((n - k) + 7) // 8
+        if data_chunk * 8 > k:
+            raise ValueError(
+                f"data_chunk={data_chunk} bytes exceeds BCH message "
+                f"capacity {k} bits for t={t}, m={m}"
+            )
 
     # ---- codec ----
 

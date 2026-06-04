@@ -515,31 +515,45 @@ class CUDABackend(OffloadBackend):
             salt_buf = np.frombuffer(salt, dtype=np.uint8).copy()
             out_buf = np.zeros(n * 32, dtype=np.uint8)
 
-            d_pwd = drv.mem_alloc(pwd_buf.nbytes)
-            d_lens = drv.mem_alloc(pwd_lens.nbytes)
-            d_salt = drv.mem_alloc(max(1, salt_buf.nbytes))
-            d_out = drv.mem_alloc(out_buf.nbytes)
-            drv.memcpy_htod(d_pwd, pwd_buf)
-            drv.memcpy_htod(d_lens, pwd_lens)
-            if salt_buf.nbytes:
-                drv.memcpy_htod(d_salt, salt_buf)
+            d_pwd = None
+            d_lens = None
+            d_salt = None
+            d_out = None
+            try:
+                d_pwd = drv.mem_alloc(pwd_buf.nbytes)
+                d_lens = drv.mem_alloc(pwd_lens.nbytes)
+                d_salt = drv.mem_alloc(max(1, salt_buf.nbytes))
+                d_out = drv.mem_alloc(out_buf.nbytes)
+                drv.memcpy_htod(d_pwd, pwd_buf)
+                drv.memcpy_htod(d_lens, pwd_lens)
+                if salt_buf.nbytes:
+                    drv.memcpy_htod(d_salt, salt_buf)
 
-            block = (min(n, 64), 1, 1)
-            grid = ((n + block[0] - 1) // block[0], 1, 1)
-            self._pbkdf2_fn(
-                d_pwd,
-                d_lens,
-                d_salt,
-                d_out,
-                np.uint32(stride),
-                np.uint32(len(salt)),
-                np.uint32(iterations),
-                np.uint32(n),
-                block=block,
-                grid=grid,
-            )
-            drv.Context.synchronize()
-            drv.memcpy_dtoh(out_buf, d_out)
+                block = (min(n, 64), 1, 1)
+                grid = ((n + block[0] - 1) // block[0], 1, 1)
+                self._pbkdf2_fn(
+                    d_pwd,
+                    d_lens,
+                    d_salt,
+                    d_out,
+                    np.uint32(stride),
+                    np.uint32(len(salt)),
+                    np.uint32(iterations),
+                    np.uint32(n),
+                    block=block,
+                    grid=grid,
+                )
+                drv.Context.synchronize()
+                drv.memcpy_dtoh(out_buf, d_out)
+            finally:
+                if d_pwd is not None:
+                    d_pwd.free()
+                if d_lens is not None:
+                    d_lens.free()
+                if d_salt is not None:
+                    d_salt.free()
+                if d_out is not None:
+                    d_out.free()
         except Exception as exc:  # noqa: BLE001
             log.warning("cuda pbkdf2 kernel run failed — CPU fallback",
                         error=f"{type(exc).__name__}: {exc}")
@@ -598,23 +612,34 @@ class CUDABackend(OffloadBackend):
             lens_buf = np.array([len(data)], dtype=np.uint32)
             out_buf = np.zeros(64, dtype=np.uint8)
 
-            d_in = drv.mem_alloc(data_buf.nbytes)
-            d_lens = drv.mem_alloc(lens_buf.nbytes)
-            d_out = drv.mem_alloc(out_buf.nbytes)
-            drv.memcpy_htod(d_in, data_buf)
-            drv.memcpy_htod(d_lens, lens_buf)
-            self._sha512_fn(
-                d_in,
-                d_lens,
-                d_out,
-                np.uint32(stride),
-                np.uint32(iterations),
-                np.uint32(1),
-                block=(1, 1, 1),
-                grid=(1, 1, 1),
-            )
-            drv.Context.synchronize()
-            drv.memcpy_dtoh(out_buf, d_out)
+            d_in = None
+            d_lens = None
+            d_out = None
+            try:
+                d_in = drv.mem_alloc(data_buf.nbytes)
+                d_lens = drv.mem_alloc(lens_buf.nbytes)
+                d_out = drv.mem_alloc(out_buf.nbytes)
+                drv.memcpy_htod(d_in, data_buf)
+                drv.memcpy_htod(d_lens, lens_buf)
+                self._sha512_fn(
+                    d_in,
+                    d_lens,
+                    d_out,
+                    np.uint32(stride),
+                    np.uint32(iterations),
+                    np.uint32(1),
+                    block=(1, 1, 1),
+                    grid=(1, 1, 1),
+                )
+                drv.Context.synchronize()
+                drv.memcpy_dtoh(out_buf, d_out)
+            finally:
+                if d_in is not None:
+                    d_in.free()
+                if d_lens is not None:
+                    d_lens.free()
+                if d_out is not None:
+                    d_out.free()
         except Exception as exc:  # noqa: BLE001
             log.warning("cuda sha512 kernel run failed — CPU fallback",
                         error=f"{type(exc).__name__}: {exc}")

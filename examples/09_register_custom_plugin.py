@@ -70,7 +70,14 @@ class ExampleTcpEScanner(DeepViewPlugin):
     def run(self) -> PluginResult:
         layer_name = str(self.config.get("layer", "target"))
         max_hits = int(self.config.get("max_hits", 50))
-        layer = self.context.layers.get(layer_name)
+        # A well-behaved plugin reports a missing/invalid target as a result
+        # row rather than letting the exception escape run().
+        try:
+            layer = self.context.layers.get(layer_name)
+        except Exception as exc:  # noqa: BLE001 - surface any lookup failure
+            return PluginResult(
+                columns=["error"], rows=[{"error": f"layer {layer_name!r}: {exc}"}]
+            )
 
         read = getattr(layer, "read", None)
         max_addr = getattr(layer, "maximum_address", 0)

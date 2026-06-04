@@ -643,7 +643,7 @@ Top-level landing pages:
 | `pip install -e ".[gpu]"` | pycuda, pyopencl | GPU VRAM imaging |
 | `pip install -e ".[ml]"` | scikit-learn, xgboost | Anomaly ML models |
 | `pip install -e ".[sigma]"` | pyyaml | Sigma rule ingest |
-| `pip install -e ".[sidechannel]"` | numpy, scipy | Side-channel analysis |
+| `pip install -e ".[sidechannel]"` | numpy, scipy | Side-channel analysis (SDR / ChipWhisperer / rf-SQUID / dc-SQUID) |
 | `pip install -e ".[disassembly]"` | Capstone, pyhidra | Ghidra headless |
 | `pip install -e ".[storage]"` | pytsk3 + `pyfs*` family | Filesystem adapters |
 | `pip install -e ".[compression]"` | zstandard, lz4, python-lzo | Encoding layers |

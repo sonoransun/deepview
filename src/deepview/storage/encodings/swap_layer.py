@@ -182,8 +182,22 @@ class WindowsSwapLayer(DataLayer):
     ) -> None:
         self._backing = backing
         self._name = name or "windows_pagefile"
-        self._valid_runs: list[tuple[int, int]] = list(valid_runs or [])
-        self._passthrough = not self._valid_runs
+        runs: list[tuple[int, int]] = []
+        for start, rlen in valid_runs or []:
+            if start < 0:
+                raise ValueError(
+                    f"WindowsSwapLayer: valid run offset must be non-negative (got {start})"
+                )
+            if rlen < 0:
+                raise ValueError(
+                    f"WindowsSwapLayer: valid run length must be non-negative (got {rlen})"
+                )
+            runs.append((start, rlen))
+        self._valid_runs: list[tuple[int, int]] = runs
+        # Passthrough is keyed off whether the caller supplied *any* runs at
+        # all, not the filtered list: an explicit (possibly degenerate) run
+        # list signals "enforce", while no runs signals "opaque pagefile".
+        self._passthrough = not valid_runs
 
     @classmethod
     def from_sidecar(
@@ -194,7 +208,21 @@ class WindowsSwapLayer(DataLayer):
     ) -> WindowsSwapLayer:
         raw = sidecar.read_text(encoding="utf-8")
         entries = json.loads(raw)
-        runs = [(int(e["offset"]), int(e["length"])) for e in entries]
+        if not isinstance(entries, list):
+            raise ValueError(
+                "WindowsSwapLayer sidecar must be a JSON array of "
+                '{"offset": int, "length": int} objects'
+            )
+        runs: list[tuple[int, int]] = []
+        for i, entry in enumerate(entries):
+            try:
+                runs.append((int(entry["offset"]), int(entry["length"])))
+            except (TypeError, KeyError, ValueError) as exc:
+                raise ValueError(
+                    f"WindowsSwapLayer sidecar entry {i} is malformed "
+                    '(need {"offset": int, "length": int}): '
+                    f"{entry!r}"
+                ) from exc
         return cls(backing, valid_runs=runs, name=name)
 
     def _in_valid_run(self, offset: int, length: int) -> bool:

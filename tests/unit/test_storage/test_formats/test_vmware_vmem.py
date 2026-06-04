@@ -55,3 +55,16 @@ class TestVMwareVMEMFlat:
         with VMwareVMEMLayer(vmem) as layer:
             assert layer.is_sparse is False
             assert layer.regions == []
+
+    def test_read_after_close(self, tmp_path: Path) -> None:
+        """Reading a flat layer whose mmap was dropped degrades gracefully.
+
+        Pins the explicit None guard that replaced an ``assert`` in
+        ``_read_flat`` (survives ``python -O``).
+        """
+        vmem = tmp_path / "closed.vmem"
+        vmem.write_bytes(b"\x77" * 64)
+        layer = VMwareVMEMLayer(vmem)
+        layer.close()  # self._mmap -> None
+        assert layer.read(0, 32) == b""
+        assert layer.read(0, 32, pad=True) == b"\x00" * 32

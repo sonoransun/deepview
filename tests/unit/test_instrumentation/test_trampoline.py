@@ -129,3 +129,108 @@ class TestGenerateTrampoline:
 
         # Different base_addr should produce different jump offsets
         assert result_a != result_b
+
+
+class TestGenerateTrampolineAarch64:
+    """Test full trampoline generation for AArch64."""
+
+    def test_generate_trampoline_aarch64(self):
+        gen = TrampolineGenerator(arch="aarch64")
+        # stp x29, x30, [sp, #-16]!; mov x29, sp (8 bytes, AArch64 prologue)
+        stolen = b"\xfd\x7b\xbf\xa9\xfd\x03\x00\x91"
+        result = gen.generate_trampoline(
+            target_addr=0x4000,
+            stolen_bytes=stolen,
+            hook_addr=0x6000,
+            return_addr=0x4008,
+            base_addr=0x5000,
+        )
+
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+        # The stolen bytes should appear in the trampoline.
+        assert stolen in result
+        # There must be a jump (at least one 4-byte instruction) after the
+        # stolen bytes.
+        stolen_pos = result.index(stolen)
+        after_stolen = result[stolen_pos + len(stolen):]
+        assert len(after_stolen) >= 4
+        # AArch64 instructions are 4-byte aligned/sized.
+        assert len(result) % 4 == 0
+        # The hook address should be loaded via MOVZ X16 (#0x6000 << 5 into the
+        # low 16-bit immediate field).
+        movz = struct.pack("<I", 0xD2800010 | ((0x6000 & 0xFFFF) << 5))
+        assert movz in result
+
+    def test_generate_trampoline_aarch64_base_addr_matters(self):
+        gen = TrampolineGenerator(arch="aarch64")
+        stolen = b"\xfd\x7b\xbf\xa9\xfd\x03\x00\x91"
+
+        result_a = gen.generate_trampoline(
+            target_addr=0x4000,
+            stolen_bytes=stolen,
+            hook_addr=0x6000,
+            return_addr=0x4008,
+            base_addr=0,
+        )
+        result_b = gen.generate_trampoline(
+            target_addr=0x4000,
+            stolen_bytes=stolen,
+            hook_addr=0x6000,
+            return_addr=0x4008,
+            base_addr=0x10000,
+        )
+
+        # The trailing branch encoding depends on base_addr.
+        assert result_a != result_b
+
+
+class TestGenerateTrampolineX86:
+    """Test full trampoline generation for 32-bit x86."""
+
+    def test_generate_trampoline_x86(self):
+        gen = TrampolineGenerator(arch="x86")
+        stolen = b"\x55\x89\xe5\x90\x90"  # push ebp; mov ebp, esp; nop; nop (5 bytes)
+        result = gen.generate_trampoline(
+            target_addr=0x4000,
+            stolen_bytes=stolen,
+            hook_addr=0x6000,
+            return_addr=0x4005,
+            base_addr=0x5000,
+        )
+
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+        # The stolen bytes should appear in the trampoline.
+        assert stolen in result
+        # pushad / pushfd prologue at the start.
+        assert result[0:2] == b"\x60\x9c"
+        # mov eax, hook_addr embedded.
+        assert b"\xb8" + struct.pack("<I", 0x6000) in result
+        # There must be a jump after the stolen bytes.
+        stolen_pos = result.index(stolen)
+        after_stolen = result[stolen_pos + len(stolen):]
+        assert len(after_stolen) > 0
+        assert after_stolen[0:1] == b"\xe9"  # relative JMP
+
+    def test_generate_trampoline_x86_base_addr_matters(self):
+        gen = TrampolineGenerator(arch="x86")
+        stolen = b"\x55\x89\xe5\x90\x90"
+
+        result_a = gen.generate_trampoline(
+            target_addr=0x4000,
+            stolen_bytes=stolen,
+            hook_addr=0x6000,
+            return_addr=0x4005,
+            base_addr=0,
+        )
+        result_b = gen.generate_trampoline(
+            target_addr=0x4000,
+            stolen_bytes=stolen,
+            hook_addr=0x6000,
+            return_addr=0x4005,
+            base_addr=0x10000,
+        )
+
+        # Different base_addr changes the relative jump offset.
+        assert result_a != result_b

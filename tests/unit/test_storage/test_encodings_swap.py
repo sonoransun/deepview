@@ -167,3 +167,50 @@ class TestWindowsSwapLayer:
         layer = WindowsSwapLayer(backing)
         with pytest.raises(NotImplementedError):
             layer.write(0, b"X")
+
+    def test_negative_run_offset_rejected(self) -> None:
+        backing = BytesBackingLayer(b"\x00" * 64)
+        with pytest.raises(ValueError, match="offset"):
+            WindowsSwapLayer(backing, valid_runs=[(-1, 16)])
+
+    def test_negative_run_length_rejected(self) -> None:
+        backing = BytesBackingLayer(b"\x00" * 64)
+        with pytest.raises(ValueError, match="length"):
+            WindowsSwapLayer(backing, valid_runs=[(0, -16)])
+
+    def test_explicit_runs_enforce_even_when_degenerate(self) -> None:
+        # Supplying *any* run list (even a zero-length one) signals "enforce",
+        # not "passthrough": a read outside the declared coverage must fail.
+        backing = BytesBackingLayer(b"\xcc" * 4096)
+        layer = WindowsSwapLayer(backing, valid_runs=[(0, 0)])
+        with pytest.raises(ValueError):
+            layer.read(0, 16)
+        assert layer.read(0, 16, pad=True) == b"\x00" * 16
+
+    def test_from_sidecar_round_trip(self, tmp_path) -> None:
+        backing = BytesBackingLayer(b"\xdd" * 4096)
+        sidecar = tmp_path / "runs.json"
+        sidecar.write_text(
+            '[{"offset": 0, "length": 16}, {"offset": 1024, "length": 16}]',
+            encoding="utf-8",
+        )
+        layer = WindowsSwapLayer.from_sidecar(backing, sidecar)
+        assert layer.read(0, 8) == b"\xdd" * 8
+        assert layer.read(1024, 8) == b"\xdd" * 8
+        with pytest.raises(ValueError):
+            layer.read(512, 8)
+
+    def test_from_sidecar_non_array_rejected(self, tmp_path) -> None:
+        backing = BytesBackingLayer(b"\x00" * 64)
+        sidecar = tmp_path / "bad.json"
+        sidecar.write_text('{"offset": 0, "length": 16}', encoding="utf-8")
+        with pytest.raises(ValueError, match="array"):
+            WindowsSwapLayer.from_sidecar(backing, sidecar)
+
+    def test_from_sidecar_malformed_entry_rejected(self, tmp_path) -> None:
+        backing = BytesBackingLayer(b"\x00" * 64)
+        sidecar = tmp_path / "bad_entry.json"
+        # Missing "length" key.
+        sidecar.write_text('[{"offset": 0}]', encoding="utf-8")
+        with pytest.raises(ValueError, match="malformed"):
+            WindowsSwapLayer.from_sidecar(backing, sidecar)

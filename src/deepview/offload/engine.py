@@ -21,7 +21,7 @@ I/O-heavy work or when the payload is not picklable.
 """
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Set
 from concurrent.futures import Future
 from typing import TYPE_CHECKING
 
@@ -104,8 +104,8 @@ class OffloadEngine:
     # Submission
     # ------------------------------------------------------------------
 
-    def _pick(self, backend: str | None) -> tuple[str, OffloadBackend]:
-        name = backend or self._default_backend
+    def _resolve_named(self, name: str) -> tuple[str, OffloadBackend]:
+        """Resolve an explicit backend *name*, raising :class:`KeyError` if absent."""
         if name not in self._backends:
             raise KeyError(
                 f"No offload backend registered under {name!r}; "
@@ -113,13 +113,99 @@ class OffloadEngine:
             )
         return name, self._backends[name]
 
+    def _first_covering(
+        self, requirements: Set[str]
+    ) -> tuple[str, OffloadBackend] | None:
+        """First registered+available backend whose capabilities cover *requirements*.
+
+        Insertion order is honoured (``thread`` then ``process`` then any
+        GPU/remote stubs), so the cheapest always-on backend wins when more
+        than one satisfies the requirement set. Backends that are not
+        currently available (shut down, GPU device gone) are skipped.
+        """
+        need = set(requirements)
+        for name, backend in self._backends.items():
+            if not backend.is_available():
+                continue
+            if need.issubset(backend.capabilities()):
+                return name, backend
+        return None
+
+    def select_backend(
+        self,
+        backend: str | None = None,
+        *,
+        requirements: Set[str] | None = None,
+        io_bound: bool = False,
+    ) -> tuple[str, OffloadBackend]:
+        """Resolve the ``(name, backend)`` pair a job should run on.
+
+        Selection rules, in priority order:
+
+        1. An explicit *backend* name wins — it is resolved and validated
+           (raising :class:`KeyError` when unregistered), regardless of
+           the other hints. This preserves the long-standing
+           ``submit(job, backend=...)`` contract.
+        2. If *requirements* are declared, the first registered backend —
+           in insertion order — that is currently available and whose
+           :meth:`~OffloadBackend.capabilities` cover the requirement set
+           is chosen. If none cover them, a :class:`KeyError` lists what
+           was needed and which capabilities are on offer.
+        3. Otherwise *io_bound* jobs prefer the ``thread`` backend (when
+           registered + available); everything else — and the io_bound
+           fall-through — lands on the configured default (``process``).
+
+        GPU/remote backends are therefore *never* auto-selected unless the
+        caller either names them explicitly or declares a requirement set
+        that only a GPU/remote backend can satisfy.
+        """
+        if backend is not None:
+            return self._resolve_named(backend)
+
+        if requirements:
+            match = self._first_covering(requirements)
+            if match is not None:
+                return match
+            offered = {
+                name: sorted(b.capabilities())
+                for name, b in self._backends.items()
+            }
+            raise KeyError(
+                f"No registered offload backend covers requirements "
+                f"{sorted(requirements)}; available capabilities: {offered}"
+            )
+
+        if io_bound:
+            thread = self._backends.get("thread")
+            if thread is not None and thread.is_available():
+                return "thread", thread
+
+        return self._resolve_named(self._default_backend)
+
+    def _pick(self, backend: str | None) -> tuple[str, OffloadBackend]:
+        """Backwards-compatible shim around :meth:`select_backend`.
+
+        Retained because callers (and tests) still call ``_pick(None)`` /
+        ``_pick("thread")`` directly; it is exactly ``select_backend`` with
+        no requirement/io hints.
+        """
+        return self.select_backend(backend)
+
     def submit(
         self,
         job: OffloadJob[object, object],
         *,
         backend: str | None = None,
+        requirements: Set[str] | None = None,
+        io_bound: bool = False,
     ) -> OffloadFuture[object]:
-        """Submit *job* to the named backend (or the default) and return the future.
+        """Submit *job* to the selected backend and return the future.
+
+        The backend is chosen by :meth:`select_backend` from the explicit
+        *backend* name (if given), the job *requirements* capability set,
+        and the *io_bound* hint — see that method for the full rule order.
+        Existing callers that pass only ``backend=`` (or nothing) keep the
+        old default-to-``process`` behaviour unchanged.
 
         Publishes :class:`OffloadJobSubmittedEvent` synchronously before
         scheduling the work and :class:`OffloadJobCompletedEvent` from
@@ -128,7 +214,9 @@ class OffloadEngine:
         at submit time is bubbled directly to the caller (no future,
         so no completion event).
         """
-        name, chosen = self._pick(backend)
+        name, chosen = self.select_backend(
+            backend, requirements=requirements, io_bound=io_bound
+        )
         self._context.events.publish(
             OffloadJobSubmittedEvent(
                 job_id=job.job_id,
@@ -167,13 +255,20 @@ class OffloadEngine:
         jobs: Iterable[OffloadJob[object, object]],
         *,
         backend: str | None = None,
+        requirements: Set[str] | None = None,
+        io_bound: bool = False,
     ) -> AsyncIterator[OffloadResult]:
-        """Submit *jobs* and async-yield results in completion order."""
+        """Submit *jobs* and async-yield results in completion order.
+
+        The same backend-selection hints accepted by :meth:`submit`
+        (*backend*, *requirements*, *io_bound*) are forwarded to every job.
+        """
         import asyncio
 
         loop = asyncio.get_running_loop()
         pending: list[OffloadFuture[object]] = [
-            self.submit(j, backend=backend) for j in jobs
+            self.submit(j, backend=backend, requirements=requirements, io_bound=io_bound)
+            for j in jobs
         ]
         queue: asyncio.Queue[OffloadResult] = asyncio.Queue()
 

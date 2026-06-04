@@ -62,3 +62,15 @@ class TestHyperVVMRS:
             # With an unparseable GPADL header, we expose "(flat)" tagging.
             assert "(flat)" in layer.metadata.name
             assert layer.parsed_gpadl is False
+
+    def test_read_after_close(self, tmp_path: Path) -> None:
+        """Reading a flat .bin layer whose mmap was dropped degrades cleanly.
+
+        Pins the explicit None guard that replaced an ``assert`` in
+        ``_read_flat`` (survives ``python -O``).
+        """
+        vmrs, _binf = _build_pair(tmp_path / "g", b"\x33" * 64)
+        layer = HyperVVMRSLayer(vmrs)
+        layer.close()  # self._bin_mmap -> None
+        assert layer.read(0, 32) == b""
+        assert layer.read(0, 32, pad=True) == b"\x00" * 32

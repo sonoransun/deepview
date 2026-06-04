@@ -674,25 +674,39 @@ class OpenCLBackend(OffloadBackend):
             out_buf = np.zeros(n * 32, dtype=np.uint8)
 
             mf = cl.mem_flags
-            d_pwd = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=pwd_buf)
-            d_lens = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=pwd_lens)
-            d_salt = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=salt_buf)
-            d_out = cl.Buffer(self._ctx, mf.WRITE_ONLY, size=out_buf.nbytes)
+            d_pwd = None
+            d_lens = None
+            d_salt = None
+            d_out = None
+            try:
+                d_pwd = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=pwd_buf)
+                d_lens = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=pwd_lens)
+                d_salt = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=salt_buf)
+                d_out = cl.Buffer(self._ctx, mf.WRITE_ONLY, size=out_buf.nbytes)
 
-            self._program.pbkdf2_sha256_kernel(
-                self._queue,
-                (n,),
-                None,
-                d_pwd,
-                d_lens,
-                d_salt,
-                d_out,
-                np.uint32(stride),
-                np.uint32(len(salt)),
-                np.uint32(iterations),
-            )
-            cl.enqueue_copy(self._queue, out_buf, d_out)
-            self._queue.finish()
+                self._program.pbkdf2_sha256_kernel(
+                    self._queue,
+                    (n,),
+                    None,
+                    d_pwd,
+                    d_lens,
+                    d_salt,
+                    d_out,
+                    np.uint32(stride),
+                    np.uint32(len(salt)),
+                    np.uint32(iterations),
+                )
+                cl.enqueue_copy(self._queue, out_buf, d_out)
+                self._queue.finish()
+            finally:
+                if d_pwd is not None:
+                    d_pwd.release()
+                if d_lens is not None:
+                    d_lens.release()
+                if d_salt is not None:
+                    d_salt.release()
+                if d_out is not None:
+                    d_out.release()
         except Exception as exc:  # noqa: BLE001
             log.warning("opencl pbkdf2 kernel run failed — CPU fallback",
                         error=f"{type(exc).__name__}: {exc}")
@@ -755,21 +769,32 @@ class OpenCLBackend(OffloadBackend):
             out_buf = np.zeros(64, dtype=np.uint8)
 
             mf = cl.mem_flags
-            d_in = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=data_buf)
-            d_lens = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=lens_buf)
-            d_out = cl.Buffer(self._ctx, mf.WRITE_ONLY, size=out_buf.nbytes)
-            self._program.sha512_iter_kernel(
-                self._queue,
-                (1,),
-                None,
-                d_in,
-                d_lens,
-                d_out,
-                np.uint32(stride),
-                np.uint32(iterations),
-            )
-            cl.enqueue_copy(self._queue, out_buf, d_out)
-            self._queue.finish()
+            d_in = None
+            d_lens = None
+            d_out = None
+            try:
+                d_in = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=data_buf)
+                d_lens = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=lens_buf)
+                d_out = cl.Buffer(self._ctx, mf.WRITE_ONLY, size=out_buf.nbytes)
+                self._program.sha512_iter_kernel(
+                    self._queue,
+                    (1,),
+                    None,
+                    d_in,
+                    d_lens,
+                    d_out,
+                    np.uint32(stride),
+                    np.uint32(iterations),
+                )
+                cl.enqueue_copy(self._queue, out_buf, d_out)
+                self._queue.finish()
+            finally:
+                if d_in is not None:
+                    d_in.release()
+                if d_lens is not None:
+                    d_lens.release()
+                if d_out is not None:
+                    d_out.release()
         except Exception as exc:  # noqa: BLE001
             log.warning("opencl sha512 kernel run failed — CPU fallback",
                         error=f"{type(exc).__name__}: {exc}")

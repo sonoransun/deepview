@@ -52,6 +52,7 @@ from deepview.cli.commands.storage import storage
 from deepview.cli.commands.filesystem import filesystem
 from deepview.cli.commands.unlock import unlock
 from deepview.cli.commands.unlock_native import unlock_native
+from deepview.cli.commands.sidechannel import sidechannel
 
 main.add_command(memory)
 main.add_command(vm)
@@ -71,6 +72,7 @@ main.add_command(storage)
 main.add_command(filesystem)
 main.add_command(unlock)
 main.add_command(unlock_native)
+main.add_command(sidechannel)
 
 # Add plugin list command at root level
 @main.command("plugins")
@@ -169,9 +171,23 @@ def doctor(ctx):
         ("paramiko", "SSH remote acquisition"),
         ("grpc", "gRPC network agent"),
     ]
+    # When an accelerator is absent, note whether extraction degrades to a
+    # pure-Python fallback or is unavailable until the extra is installed.
+    # NB: ``\[`` escapes the literal '[' so Rich does not treat e.g.
+    # ``[compression]`` as a markup tag and swallow it.
+    absent_note = {
+        "reedsolo": r"slower pure-Python Reed-Solomon fallback active; pip install 'deepview\[ecc]'",
+        "galois": r"BCH limited to t=1 without it; pip install 'deepview\[ecc]'",
+        "zstandard": r"no fallback for zstd pages; pip install 'deepview\[compression]'",
+        "lz4": r"no fallback for lz4 pages; pip install 'deepview\[compression]'",
+        "lzo": r"no fallback for lzo pages; pip install 'deepview\[compression]'",
+        "argon2": r"LUKS2/VeraCrypt Argon2 unlock unavailable; pip install 'deepview\[containers]'",
+    }
     for name, desc in storage_modules:
         try:
             __import__(name)
             console.print(f"  [green]✓[/green] {name} — {desc}")
         except ImportError:
-            console.print(f"  [red]✗[/red] {name} — {desc}")
+            note = absent_note.get(name)
+            suffix = f" [dim]({note})[/dim]" if note else ""
+            console.print(f"  [red]✗[/red] {name} — {desc}{suffix}")

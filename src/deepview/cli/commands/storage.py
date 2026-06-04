@@ -283,7 +283,9 @@ def storage_list(ctx: click.Context) -> None:
     console: Console = ctx.obj["console"]
     _ensure_adapters_registered(context)
 
-    layers_tab = Table(title="Registered layers")
+    # min_width keeps the section title on one line even when the table is
+    # empty — otherwise Rich wraps a title wider than the (tiny) empty box.
+    layers_tab = Table(title="Registered layers", min_width=30)
     layers_tab.add_column("Name", style="cyan")
     layers_tab.add_column("Type")
     for name in context.layers.list_layers():
@@ -291,19 +293,19 @@ def storage_list(ctx: click.Context) -> None:
         layers_tab.add_row(name, type(obj).__name__)
     console.print(layers_tab)
 
-    fs_tab = Table(title="Filesystem adapters")
+    fs_tab = Table(title="Filesystem adapters", min_width=30)
     fs_tab.add_column("Name", style="cyan")
     for name in context.storage.filesystems():
         fs_tab.add_row(name)
     console.print(fs_tab)
 
-    ftl_tab = Table(title="FTL translators")
+    ftl_tab = Table(title="FTL translators", min_width=30)
     ftl_tab.add_column("Name", style="cyan")
     for name in context.storage.ftl_translators():
         ftl_tab.add_row(name)
     console.print(ftl_tab)
 
-    ecc_tab = Table(title="ECC decoders")
+    ecc_tab = Table(title="ECC decoders", min_width=30)
     ecc_tab.add_column("Name", style="cyan")
     for name in context.storage.ecc_decoders():
         ecc_tab.add_row(name)

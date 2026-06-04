@@ -270,6 +270,40 @@ class OffloadJobCompletedEvent(Event):
         self.error = error
 
 
+class SideChannelCaptureStartedEvent(Event):
+    def __init__(self, *, probe: str, subject: str, samples: int) -> None:
+        self.probe = probe
+        self.subject = subject
+        self.samples = samples
+
+
+class SideChannelCaptureProgressEvent(Event):
+    def __init__(
+        self, *, probe: str, samples_done: int, samples_total: int, stage: str
+    ) -> None:
+        self.probe = probe
+        self.samples_done = samples_done
+        self.samples_total = samples_total
+        self.stage = stage
+
+
+class SideChannelCaptureCompletedEvent(Event):
+    def __init__(
+        self,
+        *,
+        probe: str,
+        subject: str,
+        samples: int,
+        sha256: str,
+        elapsed_s: float,
+    ) -> None:
+        self.probe = probe
+        self.subject = subject
+        self.samples = samples
+        self.sha256 = sha256
+        self.elapsed_s = elapsed_s
+
+
 class EventBus:
     """Decoupled publish-subscribe event distribution."""
 

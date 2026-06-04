@@ -77,14 +77,21 @@ class EMMCRawLayer(DataLayer):
             self.has_mbr = sig == _MBR_SIGNATURE
         except Exception:
             self.has_mbr = False
-        if self._size >= _GPT_HEADER_OFFSET + 8:
+        # The GPT header lives at LBA 1 — i.e. one logical block in. That is
+        # 0x200 for the usual 512 B sector, but block-size-relative for 4 Kn
+        # devices. Probe the block-relative offset and fall back to the
+        # canonical 0x200 so 512 B dumps stay recognised either way.
+        gpt_offsets = {self._block_size, _GPT_HEADER_OFFSET}
+        for gpt_off in sorted(gpt_offsets):
+            if self._size < gpt_off + 8:
+                continue
             try:
-                gpt = bytes(
-                    self._mmap[_GPT_HEADER_OFFSET : _GPT_HEADER_OFFSET + 8]
-                )
-                self.has_gpt = gpt == _GPT_SIGNATURE
+                gpt = bytes(self._mmap[gpt_off : gpt_off + 8])
             except Exception:
-                self.has_gpt = False
+                continue
+            if gpt == _GPT_SIGNATURE:
+                self.has_gpt = True
+                break
         # Typical hints for concatenated boot1+boot2+user dumps: 4 MiB each
         # boot partition, RPMB sitting after. We only expose these when the
         # file is at least large enough to contain them.
