@@ -1,0 +1,80 @@
+# Deep View Linux extended ruleset.
+#
+# Higher-coverage Linux behaviours, including the first multi-step
+# (sequence) and threshold (aggregate) rules. Single-event rules use the
+# same FilterExpr DSL as the baseline; sequence/aggregate rules are
+# evaluated per-PID by the classifier's stateful matcher.
+
+rules:
+  - id: linux.persist.cron_write
+    title: Write to a cron directory
+    severity: warning
+    category: persistence
+    attack_ids: [T1053.003]
+    match: 'category == "file_io" and (args.filename glob "/etc/cron*" or args.filename glob "/var/spool/cron/*")'
+    labels:
+      tactic: persistence
+      source: deepview.builtin.linux_extended
+
+  - id: linux.persist.ssh_authorized_keys
+    title: Write to authorized_keys
+    severity: critical
+    category: persistence
+    attack_ids: [T1098.004]
+    match: 'category == "file_io" and args.filename glob "*/.ssh/authorized_keys"'
+    labels:
+      tactic: persistence
+      source: deepview.builtin.linux_extended
+
+  - id: linux.discovery.sensitive_read
+    title: Read of a credential file
+    severity: warning
+    category: credential_access
+    attack_ids: [T1003.008]
+    match: 'category == "file_io" and args.filename in ["/etc/shadow", "/etc/gshadow"]'
+    labels:
+      tactic: credential_access
+      source: deepview.builtin.linux_extended
+
+  - id: linux.evasion.history_tamper
+    title: Shell history redirected to /dev/null
+    severity: warning
+    category: defense_evasion
+    attack_ids: [T1070.003]
+    match: 'category == "file_io" and args.filename glob "*/.bash_history" and args.target glob "/dev/null"'
+    labels:
+      tactic: defense_evasion
+      source: deepview.builtin.linux_extended
+
+  # Multi-step: a process execs from a temp path, then connects out, then
+  # writes a file — a classic dropper -> C2 -> stage chain.
+  - id: linux.seq.dropper_chain
+    title: Temp exec then network then file write
+    severity: critical
+    category: execution
+    attack_ids: [T1204, T1071]
+    sequence:
+      - match: 'syscall_name == "execve" and args.filename glob "/tmp/*"'
+      - match: 'category == "network" and syscall_name == "connect"'
+        within_s: 30
+      - match: 'category == "file_io" and syscall_name in ["write", "openat"]'
+        within_s: 30
+    labels:
+      tactic: execution
+      source: deepview.builtin.linux_extended
+
+  # Threshold: many distinct outbound destinations from one PID in a short
+  # window — port/host scanning or beaconing fan-out.
+  - id: linux.agg.connect_fanout
+    title: Many distinct outbound destinations from one process
+    severity: warning
+    category: discovery
+    attack_ids: [T1046]
+    aggregate:
+      match: 'category == "network" and syscall_name == "connect"'
+      field: 'args.daddr'
+      count: 20
+      within_s: 10
+    labels:
+      tactic: discovery
+      source: deepview.builtin.linux_extended

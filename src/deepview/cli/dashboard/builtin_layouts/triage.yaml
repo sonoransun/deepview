@@ -1,0 +1,59 @@
+# Incident-response triage layout.
+#
+# Renders a 4-row Rich layout tuned for live attack triage:
+#   - top:     host header
+#   - upper:   process-ancestry tree | syscall/category heatmap
+#   - middle:  correlated alert clusters
+#   - bottom:  raw event tail
+#
+# Assumes the dashboard CLI started a TraceManager with process +
+# syscall probes and a classification ruleset (so the alert-correlation
+# and heatmap panels have data).
+
+refresh_hz: 4
+
+trace:
+  probes: [process, syscall]
+
+classification:
+  ruleset: builtin
+
+layout:
+  root:
+    direction: vertical
+    children:
+      - {id: top, size: 3}
+      - id: upper
+        direction: horizontal
+        children:
+          - {id: upper-left, ratio: 1}
+          - {id: upper-right, ratio: 1}
+      - {id: middle, ratio: 2}
+      - {id: bottom, ratio: 2}
+
+panels:
+  - name: header
+    type: header
+    region: top
+
+  - name: process tree
+    type: process_tree
+    region: upper-left
+    seed_proc: true
+
+  - name: syscall heat
+    type: syscall_heat
+    region: upper-right
+    window_buckets: 30
+    top_n: 8
+
+  - name: correlated alerts
+    type: alert_correlation
+    region: middle
+    window_s: 5
+    threshold: 3
+
+  - name: events
+    type: event_tail
+    region: bottom
+    max_rows: 14

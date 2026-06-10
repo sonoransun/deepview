@@ -1,9 +1,33 @@
-"""ML-based anomaly detection for memory forensics (stub)."""
+"""Anomaly detection for memory forensics.
+
+Heuristic feature scoring is always available with no third-party
+dependency. When the ``ml`` extra (scikit-learn) is installed and a
+baseline has been fitted via :meth:`AnomalyDetector.fit`, an
+IsolationForest contributes an outlier score that is blended with the
+heuristic (the heuristic stays a floor, so ML only ever raises a score).
+"""
 from __future__ import annotations
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
 from deepview.core.logging import get_logger
 
+if TYPE_CHECKING:
+    from deepview.core.context import AnalysisContext
+
 log = get_logger("detection.anomaly")
+
+# Stable feature ordering for the ML feature matrix.
+_ML_FEATURES = (
+    "vad_count",
+    "rwx_vad_count",
+    "module_count",
+    "unknown_module_count",
+    "thread_count",
+    "handle_count",
+    "private_memory_mb",
+    "heap_entropy",
+)
 
 
 @dataclass
@@ -55,6 +79,8 @@ class AnomalyDetector:
         self._handle_threshold = handle_threshold
         self._handle_score = handle_score
 
+        self._fitted = False
+
         if use_ml:
             try:
                 from sklearn.ensemble import IsolationForest
@@ -63,6 +89,40 @@ class AnomalyDetector:
             except ImportError:
                 log.debug("scikit_learn_not_installed")
                 self._use_ml = False
+
+    def fit(self, processes: list[dict]) -> bool:
+        """Train the IsolationForest on a baseline of normal processes.
+
+        Returns ``True`` if a model was fitted (ML enabled, scikit-learn
+        present, and enough samples), ``False`` otherwise — callers fall
+        back to the heuristic transparently.
+        """
+        if not self._use_ml or self._model is None or len(processes) < 2:
+            return False
+        matrix = [
+            [float(self.extract_features(p).get(f, 0) or 0) for f in _ML_FEATURES]
+            for p in processes
+        ]
+        try:
+            self._model.fit(matrix)
+        except Exception as e:  # noqa: BLE001 - bad data shouldn't crash the caller
+            log.warning("anomaly_fit_failed", error=str(e))
+            return False
+        self._fitted = True
+        log.info("anomaly_model_fitted", samples=len(processes))
+        return True
+
+    def _ml_score(self, features: dict) -> float:
+        """IsolationForest outlier score mapped to 0..1 (0 when unavailable)."""
+        if not self._fitted or self._model is None:
+            return 0.0
+        vector = [[float(features.get(f, 0) or 0) for f in _ML_FEATURES]]
+        try:
+            decision = float(self._model.decision_function(vector)[0])
+        except Exception:  # noqa: BLE001
+            return 0.0
+        # decision_function: positive == inlier, negative == outlier.
+        return max(0.0, min(1.0, 0.5 - decision))
 
     def extract_features(self, process: dict) -> dict:
         """Extract feature vector from process metadata."""
@@ -106,7 +166,10 @@ class AnomalyDetector:
     def score_process(self, process: dict) -> AnomalyScore:
         """Score a single process for anomalies."""
         features = self.extract_features(process)
-        score = self.score_heuristic(features)
+        heuristic = self.score_heuristic(features)
+        ml = self._ml_score(features)
+        # The heuristic is a floor; ML can only raise the score.
+        score = max(heuristic, ml)
 
         explanations = []
         if features.get("rwx_vad_count", 0) > 0:
@@ -115,6 +178,8 @@ class AnomalyDetector:
             explanations.append(f"{features['unknown_module_count']} unknown modules")
         if features.get("heap_entropy", 0) > self._entropy_threshold:
             explanations.append("high heap entropy")
+        if ml > heuristic:
+            explanations.append(f"ML outlier ({ml:.2f})")
 
         return AnomalyScore(
             entity_id=str(process.get("pid", "")),
@@ -128,3 +193,41 @@ class AnomalyDetector:
         """Score multiple processes and rank by anomaly."""
         scores = [self.score_process(p) for p in processes]
         return sorted(scores, key=lambda s: s.score, reverse=True)
+
+    def record_findings(
+        self,
+        context: AnalysisContext,
+        processes: list[dict],
+        *,
+        threshold: float = 0.6,
+    ) -> int:
+        """Score processes and emit a :class:`Finding` for each anomaly.
+
+        Closes the gap where detection results never reached the
+        ``EventBus``: every process at or above *threshold* becomes a
+        finding (published via ``context.add_finding``). Returns the count.
+        """
+        from deepview.core.findings import Finding
+        from deepview.core.types import EventSeverity
+
+        emitted = 0
+        for score in self.score_processes(processes):
+            if score.score < threshold:
+                continue
+            severity = EventSeverity.CRITICAL if score.score >= 0.8 else EventSeverity.WARNING
+            context.add_finding(
+                Finding(
+                    name="anomalous_process",
+                    title=f"Anomalous process {score.entity_name or score.entity_id}",
+                    severity=severity,
+                    category="anomaly",
+                    description=score.explanation,
+                    source="detection.anomaly",
+                    pid=int(score.entity_id) if str(score.entity_id).isdigit() else 0,
+                    process_name=score.entity_name,
+                    evidence=dict(score.features),
+                    confidence=score.score,
+                )
+            )
+            emitted += 1
+        return emitted

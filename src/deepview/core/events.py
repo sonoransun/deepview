@@ -1,7 +1,10 @@
 from __future__ import annotations
 import threading
 from collections import defaultdict
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from deepview.core.findings import Finding
 
 class Event:
     """Base event class. Subclass for specific event types."""
@@ -119,6 +122,53 @@ class NetworkPacketMangledEvent(Event):
         self.comm_guess = comm_guess
         self.before_bytes = before_bytes
         self.after_bytes = after_bytes
+
+
+class FindingEvent(Event):
+    """A forensic :class:`~deepview.core.findings.Finding` was recorded.
+
+    Published by :meth:`AnalysisContext.add_finding` so detectors become
+    first-class on the core :class:`EventBus` (historically only the
+    classifier published). ``name`` / ``severity`` are mirrored onto the
+    event so subscribers can filter without importing the finding type.
+    """
+
+    def __init__(self, *, finding: "Finding") -> None:
+        self.finding = finding
+        self.name = finding.name
+        self.severity = finding.severity.value
+        self.attack_ids = list(finding.attack_ids)
+        self.pid = finding.pid
+
+
+class EventSequenceDetectedEvent(Event):
+    """A multi-step classification rule (``sequence``/``aggregate``) fired.
+
+    Emitted by the :class:`EventClassifier` when a per-PID state machine
+    completes an ordered chain (e.g. exec -> connect -> write) or crosses
+    an aggregate threshold within a time window.
+    """
+
+    def __init__(
+        self,
+        *,
+        rule_id: str,
+        title: str,
+        severity: str,
+        pid: int,
+        comm: str = "",
+        attack_ids: list[str] | None = None,
+        labels: dict[str, str] | None = None,
+        matched_event_ids: list[str] | None = None,
+    ) -> None:
+        self.rule_id = rule_id
+        self.title = title
+        self.severity = severity
+        self.pid = pid
+        self.comm = comm
+        self.attack_ids = attack_ids or []
+        self.labels = labels or {}
+        self.matched_event_ids = matched_event_ids or []
 
 
 class EventClassifiedEvent(Event):

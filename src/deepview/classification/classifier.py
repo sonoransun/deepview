@@ -24,7 +24,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from deepview.classification.ruleset import Ruleset
-from deepview.core.events import EventClassifiedEvent
+from deepview.classification.sequences import StatefulMatcher
+from deepview.core.events import EventClassifiedEvent, EventSequenceDetectedEvent
 from deepview.core.logging import get_logger
 from deepview.core.types import EventCategory, EventSeverity
 from deepview.tracing.events import MonitorEvent
@@ -82,6 +83,7 @@ class EventClassifier:
         self._lock = threading.Lock()
         self._windows: dict[int, _PidWindow] = {}
         self._anomaly_window_s = anomaly_window_s
+        self._stateful = StatefulMatcher(ruleset)
 
     @property
     def bus(self) -> TraceEventBus:
@@ -138,6 +140,18 @@ class EventClassifier:
         """
         self._update_window(event)
         results = self._ruleset.classify(event)
+        sequence_hits = self._stateful.feed(event)
+        for hit in sequence_hits:
+            results.append(
+                ClassificationResult(
+                    rule_id=hit.rule_id,
+                    title=hit.title,
+                    severity=hit.severity,
+                    category=hit.category,
+                    attack_ids=list(hit.attack_ids),
+                    labels=dict(hit.labels),
+                )
+            )
         anomaly = self._maybe_score_anomaly(event)
         if anomaly >= 0.6:
             results.append(
@@ -180,6 +194,23 @@ class EventClassifier:
                             title=r.title,
                         )
                     )
+
+        # Correlated multi-step hits also get a dedicated typed event so
+        # subscribers can treat them as campaigns rather than single alerts.
+        if self._context is not None:
+            for hit in sequence_hits:
+                self._context.events.publish(
+                    EventSequenceDetectedEvent(
+                        rule_id=hit.rule_id,
+                        title=hit.title,
+                        severity=hit.severity,
+                        pid=hit.pid,
+                        comm=hit.comm,
+                        attack_ids=list(hit.attack_ids),
+                        labels=dict(hit.labels),
+                        matched_event_ids=list(hit.matched_event_ids),
+                    )
+                )
 
         self._classified_bus.publish_sync(event)
         return results

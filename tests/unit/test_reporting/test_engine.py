@@ -90,19 +90,22 @@ class TestGenerateHTML:
         assert content.strip().startswith("<!DOCTYPE html>")
 
     def test_generate_html_escapes_xss(self, context: AnalysisContext):
-        """Verify HTML output escapes XSS payloads in artifact data."""
-        context.artifacts.add(
-            "test_cat<script>", {"key": "<img onerror=alert(1)>"}
+        """Verify HTML output escapes XSS payloads carried on a finding."""
+        from deepview.core.findings import Finding
+
+        context.add_finding(
+            Finding(
+                name="evil",
+                title="<img onerror=alert(1)>",
+                description="<script>alert(2)</script>",
+            )
         )
         engine = ReportEngine(context)
         html = engine.generate_html()
 
-        # The category name is .title()'d then escaped, so <Script> becomes &lt;Script&gt;
-        assert "&lt;Script&gt;" in html
-        # Ensure no raw <script> tags appear in the body (outside the <style> block)
-        body_html = html.split("</style>")[-1]
-        assert "<script>" not in body_html.lower()
-
-        # The artifact value should be escaped
+        # Jinja2 autoescape turns the payloads into entity-escaped text.
         assert "&lt;img onerror=alert(1)&gt;" in html
         assert "<img onerror=alert(1)>" not in html
+        # No raw injected script survives in the body (outside the <style> block).
+        body_html = html.split("</style>")[-1]
+        assert "<script>alert(2)</script>" not in body_html

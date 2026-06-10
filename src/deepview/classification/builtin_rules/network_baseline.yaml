@@ -1,0 +1,53 @@
+# Deep View network baseline ruleset.
+#
+# Cross-platform network behaviours classified from connection events.
+# The aggregate rules are evaluated per-PID by the stateful matcher.
+
+rules:
+  - id: net.c2.uncommon_port
+    title: Outbound connection to an uncommon high port
+    severity: info
+    category: command_and_control
+    attack_ids: [T1571]
+    match: 'category == "network" and syscall_name == "connect" and args.dport in [4444, 1337, 31337, 8443, 9001]'
+    labels:
+      tactic: command_and_control
+      source: deepview.builtin.network_baseline
+
+  - id: net.exfil.dns_long
+    title: Suspiciously long DNS query (possible tunnelling)
+    severity: warning
+    category: exfiltration
+    attack_ids: [T1048.003, T1071.004]
+    match: 'category == "network" and args.dport == 53 and args.qname_len > 100'
+    labels:
+      tactic: exfiltration
+      source: deepview.builtin.network_baseline
+
+  - id: net.recon.port_scan
+    title: Many distinct destination ports from one process
+    severity: warning
+    category: discovery
+    attack_ids: [T1046]
+    aggregate:
+      match: 'category == "network" and syscall_name == "connect"'
+      field: 'args.dport'
+      count: 30
+      within_s: 5
+    labels:
+      tactic: discovery
+      source: deepview.builtin.network_baseline
+
+  # Steady beaconing: a sustained volume of connects to the SAME host.
+  - id: net.c2.beacon_volume
+    title: High-volume connections in a short window
+    severity: warning
+    category: command_and_control
+    attack_ids: [T1071.001]
+    aggregate:
+      match: 'category == "network" and syscall_name == "connect"'
+      count: 50
+      within_s: 10
+    labels:
+      tactic: command_and_control
+      source: deepview.builtin.network_baseline

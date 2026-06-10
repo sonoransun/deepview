@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Deep View Forensic Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           margin: 40px; background: #f5f5f5; color: #1a1a2e; }
+    .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 40px;
+                 border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    h1 { border-bottom: 3px solid #16213e; padding-bottom: 10px; }
+    h2 { color: #16213e; margin-top: 34px; }
+    h3 { color: #0f3460; }
+    .meta { color: #666; font-size: 0.9em; }
+    .cards { display: flex; gap: 14px; flex-wrap: wrap; margin: 16px 0; }
+    .card { flex: 1; min-width: 120px; padding: 16px; border-radius: 8px; color: #fff; text-align: center; }
+    .card .n { font-size: 2em; font-weight: bold; }
+    .card.critical { background: #d64550; }
+    .card.warning { background: #e8a13a; }
+    .card.info { background: #3b82c4; }
+    .card.total { background: #16213e; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.92em; }
+    th { background: #16213e; color: #fff; }
+    tr:nth-child(even) { background: #f2f2f2; }
+    .sev-critical { color: #d64550; font-weight: bold; }
+    .sev-warning { color: #b8860b; font-weight: bold; }
+    .sev-info { color: #3b82c4; }
+    .viz { overflow-x: auto; border: 1px solid #eee; border-radius: 6px; padding: 8px; margin: 8px 0; }
+    .charts { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Deep View Forensic Report</h1>
+    <p class="meta">Generated: {{ generated_at }} | Session: {{ session_id }}</p>
+
+    <h2>Summary</h2>
+    <div class="cards">
+      <div class="card total"><div class="n">{{ summary.total }}</div>findings</div>
+      <div class="card critical"><div class="n">{{ summary.by_severity.critical }}</div>critical</div>
+      <div class="card warning"><div class="n">{{ summary.by_severity.warning }}</div>warning</div>
+      <div class="card info"><div class="n">{{ summary.by_severity.info }}</div>info</div>
+    </div>
+    <div class="charts">
+      <div class="viz">{{ severity_chart_svg | safe }}</div>
+      {% if rate_chart_svg %}<div class="viz">{{ rate_chart_svg | safe }}</div>{% endif %}
+    </div>
+
+    <h2>Platform</h2>
+    <table>
+      <tr><th>Property</th><th>Value</th></tr>
+      <tr><td>OS</td><td>{{ platform.os }}</td></tr>
+      <tr><td>Architecture</td><td>{{ platform.arch }}</td></tr>
+      <tr><td>Kernel</td><td>{{ platform.kernel }}</td></tr>
+    </table>
+
+    <h2>Event Timeline</h2>
+    <div class="viz">{{ timeline_svg | safe }}</div>
+
+    <h2>MITRE ATT&amp;CK Coverage</h2>
+    <div class="viz">{{ attack_matrix_svg | safe }}</div>
+
+    <h2>Process Tree</h2>
+    <div class="viz">{{ process_tree_svg | safe }}</div>
+
+    {% if summary.top_techniques %}
+    <h2>Top Techniques</h2>
+    <table>
+      <tr><th>Technique</th><th>Count</th></tr>
+      {% for tid, count in summary.top_techniques %}
+      <tr><td>{{ tid }}</td><td>{{ count }}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if summary.affected_processes %}
+    <h2>Affected Processes</h2>
+    <table>
+      <tr><th>PID</th><th>Process</th><th>Worst severity</th><th>Findings</th></tr>
+      {% for proc in summary.affected_processes %}
+      <tr>
+        <td>{{ proc.pid }}</td>
+        <td>{{ proc.name }}</td>
+        <td class="sev-{{ proc.severity }}">{{ proc.severity }}</td>
+        <td>{{ proc.count }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if findings %}
+    <h2>Findings</h2>
+    <table>
+      <tr><th>Severity</th><th>Title</th><th>Technique</th><th>PID</th><th>Description</th></tr>
+      {% for f in findings %}
+      <tr>
+        <td class="sev-{{ f.severity }}">{{ f.severity }}</td>
+        <td>{{ f.title }}</td>
+        <td>{{ f.technique }}</td>
+        <td>{{ f.pid }}</td>
+        <td>{{ f.description }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if layers %}
+    <h2>Data Layers</h2>
+    <ul>{% for layer in layers %}<li>{{ layer }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+</body>
+</html>

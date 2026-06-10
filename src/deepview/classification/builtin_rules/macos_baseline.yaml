@@ -1,0 +1,56 @@
+# Deep View macOS baseline ruleset.
+#
+# Starter macOS behaviours against the cross-platform MonitorEvent
+# schema (populated by the DTrace/Endpoint-Security backend). Dormant on
+# event shapes lacking the referenced fields.
+
+rules:
+  - id: macos.persist.launch_agent
+    title: Write to a LaunchAgent/LaunchDaemon plist
+    severity: warning
+    category: persistence
+    attack_ids: [T1543.001, T1543.004]
+    match: 'category == "file_io" and (args.filename glob "*/Library/LaunchAgents/*.plist" or args.filename glob "*/Library/LaunchDaemons/*.plist")'
+    labels:
+      tactic: persistence
+      source: deepview.builtin.macos_baseline
+
+  - id: macos.evasion.gatekeeper_disable
+    title: Gatekeeper assessment disabled via spctl
+    severity: critical
+    category: defense_evasion
+    attack_ids: [T1553.001]
+    match: 'process.comm == "spctl" and args.cmdline contains "--master-disable"'
+    labels:
+      tactic: defense_evasion
+      source: deepview.builtin.macos_baseline
+
+  - id: macos.cred.keychain_dump
+    title: security command dumping keychain
+    severity: critical
+    category: credential_access
+    attack_ids: [T1555.001]
+    match: 'process.comm == "security" and args.cmdline contains "dump-keychain"'
+    labels:
+      tactic: credential_access
+      source: deepview.builtin.macos_baseline
+
+  - id: macos.exec.osascript
+    title: osascript executing inline AppleScript
+    severity: warning
+    category: execution
+    attack_ids: [T1059.002]
+    match: 'process.comm == "osascript" and args.cmdline contains "-e"'
+    labels:
+      tactic: execution
+      source: deepview.builtin.macos_baseline
+
+  - id: macos.evasion.quarantine_strip
+    title: Quarantine attribute stripped with xattr
+    severity: warning
+    category: defense_evasion
+    attack_ids: [T1553.001]
+    match: 'process.comm == "xattr" and args.cmdline contains "com.apple.quarantine"'
+    labels:
+      tactic: defense_evasion
+      source: deepview.builtin.macos_baseline

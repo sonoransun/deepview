@@ -41,17 +41,51 @@ _SEVERITY_ORDER = {"info": 0, "warning": 1, "critical": 2}
 
 
 @dataclass
+class SequenceStep:
+    """One ordered step in a multi-event ``sequence`` rule."""
+
+    match: FilterExpr
+    within_s: float = 0.0  # max gap from the previous step (0 = unbounded)
+
+
+@dataclass
+class AggregateSpec:
+    """A thresholded count over a sliding window for an ``aggregate`` rule."""
+
+    count: int
+    within_s: float
+    match: FilterExpr | None = None  # events to count (None = all for the PID)
+    field: str | None = None  # count DISTINCT values of this field (None = events)
+
+
+@dataclass
 class ClassificationRule:
-    """A single classification rule after compile."""
+    """A single classification rule after compile.
+
+    A rule is either *simple* (a single-event ``match``) or *stateful*
+    (a ``sequence`` of steps, or an ``aggregate`` threshold). Stateful
+    rules are evaluated by the per-PID matcher in the classifier, not by
+    :meth:`Ruleset.classify`.
+    """
 
     id: str
     title: str
     severity: str
     category: str
     attack_ids: list[str]
-    match: FilterExpr
+    match: FilterExpr | None = None
+    sequence: list[SequenceStep] | None = None
+    aggregate: AggregateSpec | None = None
     labels: dict[str, str] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_simple(self) -> bool:
+        return self.match is not None and self.sequence is None and self.aggregate is None
+
+    @property
+    def is_stateful(self) -> bool:
+        return self.sequence is not None or self.aggregate is not None
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any]) -> "ClassificationRule":
@@ -60,13 +94,15 @@ class ClassificationRule:
         rule_id = data.get("id")
         if not rule_id:
             raise RuleLoadError("rule is missing 'id'")
-        match_text = data.get("match")
-        if not match_text:
-            raise RuleLoadError(f"rule '{rule_id}' is missing 'match'")
-        try:
-            match_expr = parse_filter(str(match_text))
-        except FilterSyntaxError as e:
-            raise RuleLoadError(f"rule '{rule_id}' match expression invalid: {e}") from e
+
+        match_expr = cls._parse_match(rule_id, data.get("match")) if data.get("match") else None
+        sequence = cls._parse_sequence(rule_id, data.get("sequence"))
+        aggregate = cls._parse_aggregate(rule_id, data.get("aggregate"))
+        if match_expr is None and sequence is None and aggregate is None:
+            raise RuleLoadError(
+                f"rule '{rule_id}' needs one of 'match', 'sequence', or 'aggregate'"
+            )
+
         severity = str(data.get("severity", "warning")).lower()
         if severity not in _SEVERITY_ORDER:
             raise RuleLoadError(
@@ -86,8 +122,57 @@ class ClassificationRule:
             category=str(data.get("category", "generic")),
             attack_ids=[str(t) for t in (data.get("attack_ids") or [])],
             match=match_expr,
+            sequence=sequence,
+            aggregate=aggregate,
             labels={str(k): str(v) for k, v in labels.items()},
             metadata=dict(metadata),
+        )
+
+    @staticmethod
+    def _parse_match(rule_id: object, text: object) -> FilterExpr:
+        try:
+            return parse_filter(str(text))
+        except FilterSyntaxError as e:
+            raise RuleLoadError(f"rule '{rule_id}' match expression invalid: {e}") from e
+
+    @classmethod
+    def _parse_sequence(
+        cls, rule_id: object, raw: object
+    ) -> list[SequenceStep] | None:
+        if raw is None:
+            return None
+        if not isinstance(raw, list) or not raw:
+            raise RuleLoadError(f"rule '{rule_id}' sequence must be a non-empty list")
+        steps: list[SequenceStep] = []
+        for i, item in enumerate(raw):
+            if not isinstance(item, dict) or "match" not in item:
+                raise RuleLoadError(
+                    f"rule '{rule_id}' sequence[{i}] must be a mapping with 'match'"
+                )
+            steps.append(
+                SequenceStep(
+                    match=cls._parse_match(rule_id, item["match"]),
+                    within_s=float(item.get("within_s", 0.0)),
+                )
+            )
+        return steps
+
+    @classmethod
+    def _parse_aggregate(cls, rule_id: object, raw: object) -> AggregateSpec | None:
+        if raw is None:
+            return None
+        if not isinstance(raw, dict):
+            raise RuleLoadError(f"rule '{rule_id}' aggregate must be a mapping")
+        if "count" not in raw or "within_s" not in raw:
+            raise RuleLoadError(
+                f"rule '{rule_id}' aggregate needs 'count' and 'within_s'"
+            )
+        match_raw = raw.get("match")
+        return AggregateSpec(
+            count=int(raw["count"]),
+            within_s=float(raw["within_s"]),
+            match=cls._parse_match(rule_id, match_raw) if match_raw else None,
+            field=str(raw["field"]) if raw.get("field") else None,
         )
 
 
@@ -152,6 +237,13 @@ class Ruleset:
         return ruleset
 
     @classmethod
+    def load_sigma_dir(cls, directory: Path | str) -> "Ruleset":
+        """Load Sigma rules from *directory* (best-effort conversion)."""
+        from deepview.classification.sigma_loader import load_sigma_dir
+
+        return load_sigma_dir(directory)
+
+    @classmethod
     def load_builtin(cls) -> "Ruleset":
         """Load every YAML file under ``builtin_rules/``."""
         base = Path(__file__).parent / "builtin_rules"
@@ -175,6 +267,8 @@ class Ruleset:
 
         out: list[ClassificationResult] = []
         for rule in self._rules:
+            if not rule.is_simple or rule.match is None:
+                continue
             try:
                 if rule.match.evaluate(event):
                     out.append(

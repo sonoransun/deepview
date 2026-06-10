@@ -15,6 +15,8 @@ dependencies = [
     "structlog>=23.0",
     "platformdirs>=4.0",
     "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "matplotlib>=3.7",
 ]
 
 [project.optional-dependencies]
@@ -56,6 +58,7 @@ ml = [
 ]
 sigma = [
     "pyyaml>=6.0",
+    "pysigma>=0.10",
 ]
 sidechannel = [
     "numpy>=1.24",

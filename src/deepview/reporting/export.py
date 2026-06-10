@@ -3,10 +3,22 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
+from typing import TypedDict
 from deepview.core.logging import get_logger
 from deepview.detection.anti_forensics import Detection
 
 log = get_logger("reporting.export")
+
+
+class CoverageEntry(TypedDict):
+    """One technique's deduped coverage across a set of detections."""
+
+    technique_id: str
+    technique_name: str
+    tactic: str
+    severity: str
+    count: int
+    detections: list[str]
 
 
 class STIXExporter:
@@ -78,9 +90,46 @@ class ATTCKMapper:
         "DRIVER_INTEGRITY_MISMATCH": {"id": "T1014", "name": "Rootkit", "tactic": "Defense Evasion"},
     }
 
-    def map_detection(self, detection: Detection) -> dict | None:
-        """Map a single detection to ATT&CK technique."""
-        return self.TECHNIQUE_MAP.get(detection.name)
+    # Friendly names for techniques that show up via ``attack_ids`` but are
+    # not in the static detection-name map. Falls back to the id itself.
+    TECHNIQUE_NAMES = {
+        "T1003": "OS Credential Dumping",
+        "T1055": "Process Injection",
+        "T1059": "Command and Scripting Interpreter",
+        "T1071": "Application Layer Protocol",
+        "T1203": "Exploitation for Client Execution",
+        "T1204": "User Execution",
+        "T1486": "Data Encrypted for Impact",
+        "T1489": "Service Stop",
+        "T1547": "Boot or Logon Autostart Execution",
+        "T1548": "Abuse Elevation Control Mechanism",
+        "T1562": "Impair Defenses",
+        "T1574": "Hijack Execution Flow",
+        "T1611": "Escape to Host",
+    }
+
+    _SEVERITY_RANK = {"info": 0, "warning": 1, "critical": 2}
+    _SEVERITY_COLOR = {"critical": "#d64550", "warning": "#e8a13a", "info": "#f2d35c"}
+
+    def map_detection(self, detection: Detection) -> dict[str, str] | None:
+        """Map a single detection to an ATT&CK technique.
+
+        Prefers the static detection-name map, then falls back to the
+        detection's own ``technique`` id so any detector that fills in a
+        MITRE id participates without needing a hardcoded entry.
+        """
+        mapping = self.TECHNIQUE_MAP.get(detection.name)
+        if mapping is not None:
+            return mapping
+        technique = getattr(detection, "technique", "")
+        if technique:
+            base = technique.split(".")[0]
+            return {
+                "id": technique,
+                "name": self.TECHNIQUE_NAMES.get(base, technique),
+                "tactic": "unknown",
+            }
+        return None
 
     def map_all(self, detections: list[Detection]) -> list[dict]:
         """Map all detections and return technique coverage."""
@@ -98,22 +147,50 @@ class ATTCKMapper:
                 })
         return results
 
-    def generate_navigator_layer(self, detections: list[Detection]) -> dict:
-        """Generate an ATT&CK Navigator layer JSON."""
-        techniques = []
-        seen = set()
+    def coverage(self, detections: list[Detection]) -> list[CoverageEntry]:
+        """Per-technique coverage, deduped and rolled up to worst severity.
 
+        This is the structured shape the HTML report's ATT&CK heatmap and
+        the Navigator layer both build from.
+        """
+        by_id: dict[str, CoverageEntry] = {}
         for det in detections:
             mapping = self.map_detection(det)
-            if mapping and mapping["id"] not in seen:
-                seen.add(mapping["id"])
-                color = "#ff0000" if det.severity.value == "critical" else "#ff6600" if det.severity.value == "warning" else "#ffcc00"
-                techniques.append({
-                    "techniqueID": mapping["id"],
-                    "color": color,
-                    "comment": det.description,
-                    "enabled": True,
-                })
+            if mapping is None:
+                continue
+            tid = mapping["id"]
+            sev = det.severity.value
+            entry = by_id.get(tid)
+            if entry is None:
+                by_id[tid] = CoverageEntry(
+                    technique_id=tid,
+                    technique_name=mapping["name"],
+                    tactic=mapping["tactic"],
+                    severity=sev,
+                    count=1,
+                    detections=[det.name],
+                )
+            else:
+                entry["count"] += 1
+                if det.name not in entry["detections"]:
+                    entry["detections"].append(det.name)
+                if self._SEVERITY_RANK.get(sev, 0) > self._SEVERITY_RANK.get(
+                    entry["severity"], 0
+                ):
+                    entry["severity"] = sev
+        return sorted(by_id.values(), key=lambda e: e["technique_id"])
+
+    def generate_navigator_layer(self, detections: list[Detection]) -> dict[str, object]:
+        """Generate an ATT&CK Navigator layer JSON from dynamic coverage."""
+        techniques = []
+        for entry in self.coverage(detections):
+            techniques.append({
+                "techniqueID": entry["technique_id"],
+                "color": self._SEVERITY_COLOR.get(entry["severity"], "#f2d35c"),
+                "score": entry["count"],
+                "comment": ", ".join(entry["detections"]),
+                "enabled": True,
+            })
 
         return {
             "name": "Deep View Forensic Analysis",

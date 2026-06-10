@@ -52,6 +52,8 @@ BUILTIN_LAYOUTS: dict[str, Path] = {
     "full": _BUILTIN_DIR / "full.yaml",
     "minimal": _BUILTIN_DIR / "minimal.yaml",
     "mangle": _BUILTIN_DIR / "mangle.yaml",
+    "triage": _BUILTIN_DIR / "triage.yaml",
+    "memory": _BUILTIN_DIR / "memory.yaml",
 }
 
 

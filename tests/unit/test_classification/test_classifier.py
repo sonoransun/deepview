@@ -77,6 +77,40 @@ class TestClassifyAndPublish:
         # The event makes it through even without classification.
         assert not sub.queue.empty()
 
+    def test_sequence_rule_publishes_sequence_event(self):
+        from deepview.core.events import EventSequenceDetectedEvent
+
+        ruleset = Ruleset.from_mappings(
+            [
+                {
+                    "id": "seq.exec_connect",
+                    "title": "exec then connect",
+                    "severity": "critical",
+                    "attack_ids": ["T1204"],
+                    "sequence": [
+                        {"match": 'syscall_name == "execve"'},
+                        {"match": 'syscall_name == "connect"', "within_s": 30},
+                    ],
+                }
+            ]
+        )
+        ctx = AnalysisContext.for_testing()
+        seq_events: list[EventSequenceDetectedEvent] = []
+        ctx.events.subscribe(EventSequenceDetectedEvent, seq_events.append)
+
+        bus = TraceEventBus()
+        classifier = EventClassifier(ctx, ruleset, source_bus=bus)
+        base = 1_700_000_000 * 1_000_000_000
+        classifier.classify_and_publish(_event(wall_clock_ns=base, syscall_name="execve"))
+        results = classifier.classify_and_publish(
+            _event(wall_clock_ns=base + 1_000_000_000, syscall_name="connect")
+        )
+        # The completed chain shows up as a classification AND a typed event.
+        assert any(r.rule_id == "seq.exec_connect" for r in results)
+        assert len(seq_events) == 1
+        assert seq_events[0].rule_id == "seq.exec_connect"
+        assert seq_events[0].pid == 42
+
     def test_pid_window_accumulates_syscalls(self):
         bus = TraceEventBus()
         classifier = EventClassifier(None, Ruleset(), source_bus=bus)

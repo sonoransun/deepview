@@ -1,0 +1,52 @@
+# Memory / process-forensics layout.
+#
+# Renders a 3-row Rich layout for live memory triage:
+#   - top:     host header
+#   - middle:  per-PID memory-region map (RWX flagged) | process tree
+#   - bottom:  per-PID anomaly-score heatmap
+#
+# The memory_map panel auto-selects the busiest PID from the trace
+# stream unless pinned with `pid:`. Assumes a TraceManager with process
+# + memory probes and a classification ruleset for the anomaly heatmap.
+
+refresh_hz: 4
+
+trace:
+  probes: [process, memory]
+
+classification:
+  ruleset: builtin
+
+layout:
+  root:
+    direction: vertical
+    children:
+      - {id: top, size: 3}
+      - id: middle
+        direction: horizontal
+        children:
+          - {id: middle-left, ratio: 2}
+          - {id: middle-right, ratio: 1}
+      - {id: bottom, ratio: 1}
+
+panels:
+  - name: memory map
+    type: memory_map
+    region: middle-left
+    max_rows: 18
+    refresh_s: 2
+
+  - name: process tree
+    type: process_tree
+    region: middle-right
+    seed_proc: true
+
+  - name: header
+    type: header
+    region: top
+
+  - name: anomaly heat
+    type: anomaly_heat
+    region: bottom
+    window: 30
+    top_n: 10

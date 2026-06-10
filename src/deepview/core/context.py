@@ -7,6 +7,7 @@ from deepview.core.events import EventBus
 from deepview.core.platform import PlatformInfo
 
 if TYPE_CHECKING:
+    from deepview.core.findings import Finding
     from deepview.instrumentation.manager import InstrumentationManager
     from deepview.offload.engine import OffloadEngine
     from deepview.plugins.registry import PluginRegistry
@@ -118,6 +119,20 @@ class AnalysisContext:
             from deepview.instrumentation.manager import InstrumentationManager
             self._instrumentation_manager = InstrumentationManager(self)
         return self._instrumentation_manager
+
+    def add_finding(self, finding: Finding) -> None:
+        """Record a forensic finding and publish a :class:`FindingEvent`.
+
+        The finding is stored in the artifact store under the
+        ``findings`` category (round-tripped via ``Finding.to_artifact``)
+        so the report exporters pick it up, and a ``FindingEvent`` is
+        published so live subscribers (dashboard, auto-inspector) react.
+        """
+        from deepview.core.events import FindingEvent
+        from deepview.core.findings import FINDINGS_CATEGORY
+
+        self.artifacts.add(FINDINGS_CATEGORY, finding.to_artifact())
+        self.events.publish(FindingEvent(finding=finding))
 
     @classmethod
     def from_config(cls, config_path=None) -> AnalysisContext:

@@ -191,3 +191,18 @@ def doctor(ctx):
             note = absent_note.get(name)
             suffix = f" [dim]({note})[/dim]" if note else ""
             console.print(f"  [red]✗[/red] {name} — {desc}{suffix}")
+
+    console.print("\n[bold]Visualization & rules:[/bold]")
+    viz_modules = [
+        ("jinja2", "HTML report templating", ""),
+        ("matplotlib", "report charts (severity, event rate)", ""),
+        ("sklearn", "ML anomaly model", r"pip install 'deepview\[ml]'"),
+        ("pysigma", "Sigma rule pipeline", r"pip install 'deepview\[sigma]'"),
+    ]
+    for name, desc, note in viz_modules:
+        try:
+            __import__(name)
+            console.print(f"  [green]✓[/green] {name} — {desc}")
+        except ImportError:
+            suffix = f" [dim]({note})[/dim]" if note else ""
+            console.print(f"  [red]✗[/red] {name} — {desc}{suffix}")

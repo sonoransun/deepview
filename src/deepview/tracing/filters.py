@@ -29,6 +29,28 @@ from typing import Any, Iterable
 from deepview.tracing.events import MonitorEvent
 
 
+def resolve_field(event: MonitorEvent, path: str) -> Any:
+    """Resolve a dot-path field (e.g. ``process.pid``, ``args.path``).
+
+    Shared by the filter evaluator and the classification sequence/
+    aggregate matchers so they all read event fields identically.
+    """
+    obj: Any = event
+    for part in path.split("."):
+        if obj is None:
+            return None
+        if isinstance(obj, dict):
+            obj = obj.get(part)
+        elif hasattr(obj, part):
+            obj = getattr(obj, part)
+        else:
+            return None
+    # Normalise enum-like values to their string ``value``.
+    if hasattr(obj, "value") and not isinstance(obj, (str, int, float, bool)):
+        return obj.value
+    return obj
+
+
 @dataclass
 class FilterRule:
     """One predicate in a filter expression."""
@@ -94,23 +116,7 @@ class FilterExpr:
 
     def _resolve_field(self, event: MonitorEvent, path: str) -> Any:
         """Resolve a dot-path field from a MonitorEvent."""
-        parts = path.split(".")
-        obj: Any = event
-        for part in parts:
-            if obj is None:
-                return None
-            if isinstance(obj, dict):
-                obj = obj.get(part)
-            elif hasattr(obj, part):
-                obj = getattr(obj, part)
-            else:
-                return None
-        # Normalise enum-like values (EventCategory, EventSeverity) to
-        # their string values so comparisons in user-supplied filters
-        # work without forcing callers to import the enum.
-        if hasattr(obj, "value") and not isinstance(obj, (str, int, float, bool)):
-            return obj.value
-        return obj
+        return resolve_field(event, path)
 
     def compile(self) -> "FilterPlan":
         """Lift cheap predicates into a :class:`FilterPlan`.

@@ -11,15 +11,23 @@ def report():
 
 @report.command()
 @click.option("--session", type=str, default=None, help="Session ID")
-@click.option("--template", type=click.Choice(["html", "markdown"]), default="html")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["html", "markdown", "json"]),
+    default="html",
+    help="Report format",
+)
 @click.option("--output", "-o", type=click.Path(), default=None, help="Output file")
 @click.pass_context
-def generate(ctx, session, template, output):
-    """Create report from analysis session."""
+def generate(ctx, session, fmt, output):
+    """Create a forensic report (visual HTML, Markdown, or JSON)."""
+    import json
+
     console = ctx.obj["console"]
     context = ctx.obj["context"]
 
-    console.print(f"[bold]Generating {template} report...[/bold]")
+    console.print(f"[bold]Generating {fmt} report...[/bold]")
 
     try:
         from deepview.reporting.engine import ReportEngine
@@ -27,19 +35,20 @@ def generate(ctx, session, template, output):
         engine = ReportEngine(context)
         output_path = Path(output) if output else None
 
-        if template == "html":
+        if fmt == "html":
             content = engine.generate_html(output=output_path)
-        else:
+        elif fmt == "markdown":
             content = engine.generate_markdown(output=output_path)
+        else:  # json
+            report = engine.generate_json(output=output_path)
+            content = json.dumps(report, indent=2, default=str)
 
         if output_path:
-            console.print(
-                f"[green]Report written to: {output_path}[/green]"
-            )
+            console.print(f"[green]Report written to: {output_path}[/green]")
         else:
             console.print(content)
 
-        console.print(f"[green]Report generation complete ({template}).[/green]")
+        console.print(f"[green]Report generation complete ({fmt}).[/green]")
 
     except Exception as e:
         console.print(f"[red]Error generating report: {e}[/red]")
@@ -60,45 +69,44 @@ def _parse_timestamp(raw: object) -> datetime | None:
         return None
 
 
-def _detections_from_artifacts(context: object) -> list:
-    """Reconstruct ``Detection`` objects from any 'name'-bearing artifact dicts.
+def _render_swimlane(console, builder) -> None:
+    """Print an ASCII swimlane (lanes by severity) for a TimelineBuilder."""
+    from rich.table import Table
+    from rich.text import Text
 
-    Detectors persist findings into the artifact store as plain dicts; the STIX
-    and ATT&CK exporters consume ``Detection`` instances, so bridge the two here.
-    """
-    from deepview.core.types import EventSeverity
-    from deepview.detection.anti_forensics import Detection
-
-    detections: list[Detection] = []
-    for items in context.artifacts.all_artifacts().values():  # type: ignore[attr-defined]
-        for item in items:
-            if not isinstance(item, dict) or "name" not in item:
-                continue
-            try:
-                severity = EventSeverity(str(item.get("severity", "info")).lower())
-            except ValueError:
-                severity = EventSeverity.INFO
-            evidence = item.get("evidence")
-            detections.append(
-                Detection(
-                    name=str(item["name"]),
-                    severity=severity,
-                    description=str(item.get("description", "")),
-                    offset=int(item.get("offset", 0) or 0),
-                    pid=int(item.get("pid", 0) or 0),
-                    process_name=str(item.get("process_name", "")),
-                    technique=str(item.get("technique", "")),
-                    evidence=evidence if isinstance(evidence, dict) else {},
-                )
-            )
-    return detections
+    width = 48
+    blocks = " ▁▂▃▄▅▆▇█"
+    severity_style = {"critical": "bold red", "warning": "yellow", "info": "cyan"}
+    span = builder.span()
+    if span is None:
+        console.print("[dim](no timestamped entries to plot)[/dim]")
+        return
+    t0, t1 = span
+    total = (t1 - t0).total_seconds() or 1.0
+    lanes = builder.lanes(by="severity")
+    grid = Table.grid(padding=(0, 1))
+    grid.add_column(justify="right", min_width=10)
+    grid.add_column()
+    for lane in ("critical", "warning", "info"):
+        entries = lanes.get(lane)
+        if not entries:
+            continue
+        counts = [0] * width
+        for e in entries:
+            frac = (e.timestamp - t0).total_seconds() / total
+            counts[min(width - 1, int(frac * (width - 1)))] += 1
+        vmax = max(counts) or 1
+        bar = "".join(blocks[min(len(blocks) - 1, int(c / vmax * (len(blocks) - 1)))] for c in counts)
+        grid.add_row(lane, Text(bar, style=severity_style.get(lane, "white")))
+    console.print(grid)
 
 
 @report.command()
 @click.option("--session", type=str, default=None, help="Session ID")
 @click.option("--output", "-o", type=click.Path(), default=None, help="Output file (JSON)")
+@click.option("--visual", is_flag=True, default=False, help="Render an ASCII swimlane")
 @click.pass_context
-def timeline(ctx, session, output):
+def timeline(ctx, session, output, visual):
     """Build an event timeline from timestamped artifacts."""
     import json
 
@@ -135,6 +143,9 @@ def timeline(ctx, session, output):
         )
         return
 
+    if visual:
+        _render_swimlane(console, builder)
+
     table = Table(title="Event timeline", min_width=40)
     table.add_column("Timestamp", style="cyan")
     table.add_column("Source")
@@ -163,7 +174,9 @@ def export(ctx, session, fmt, output):
 
         payload: object = ReportEngine(context).generate_json()
     else:
-        detections = _detections_from_artifacts(context)
+        from deepview.reporting.engine import iter_detections
+
+        detections = iter_detections(context)
         if fmt == "stix":
             from deepview.reporting.export import STIXExporter
 

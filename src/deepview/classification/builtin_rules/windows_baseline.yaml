@@ -1,0 +1,73 @@
+# Deep View Windows baseline ruleset.
+#
+# Starter Windows behaviours expressed against the cross-platform
+# MonitorEvent schema. These reference process.comm and args.cmdline,
+# which the Windows ETW backend populates; they stay dormant on event
+# shapes that lack those fields rather than misfiring.
+
+rules:
+  - id: windows.exec.lolbin_mshta
+    title: mshta.exe spawned
+    severity: warning
+    category: execution
+    attack_ids: [T1218.005]
+    match: 'process.comm == "mshta.exe"'
+    labels:
+      tactic: execution
+      source: deepview.builtin.windows_baseline
+
+  - id: windows.exec.encoded_powershell
+    title: PowerShell with an encoded command
+    severity: critical
+    category: execution
+    attack_ids: [T1059.001]
+    match: 'process.comm == "powershell.exe" and (args.cmdline contains "-enc" or args.cmdline contains "-EncodedCommand")'
+    labels:
+      tactic: execution
+      source: deepview.builtin.windows_baseline
+
+  - id: windows.cred.lsass_access
+    title: Handle opened to lsass.exe
+    severity: critical
+    category: credential_access
+    attack_ids: [T1003.001]
+    match: 'syscall_name == "OpenProcess" and args.target_image glob "*\\lsass.exe"'
+    labels:
+      tactic: credential_access
+      source: deepview.builtin.windows_baseline
+
+  - id: windows.persist.run_key
+    title: Write to a Run autostart key
+    severity: warning
+    category: persistence
+    attack_ids: [T1547.001]
+    match: 'category == "registry" and args.key contains "\\CurrentVersion\\Run"'
+    labels:
+      tactic: persistence
+      source: deepview.builtin.windows_baseline
+
+  - id: windows.evasion.bcdedit_safeboot
+    title: bcdedit/vssadmin tampering
+    severity: critical
+    category: impact
+    attack_ids: [T1490]
+    match: 'process.comm in ["bcdedit.exe", "vssadmin.exe", "wbadmin.exe"]'
+    labels:
+      tactic: impact
+      source: deepview.builtin.windows_baseline
+
+  # Office app spawning a script host — classic phishing macro chain.
+  - id: windows.seq.office_spawn_script
+    title: Office app spawned a script interpreter then connected out
+    severity: critical
+    category: execution
+    attack_ids: [T1566.001, T1059]
+    sequence:
+      - match: 'process.comm in ["winword.exe", "excel.exe", "outlook.exe"] and syscall_name == "CreateProcess"'
+      - match: 'process.comm in ["cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe"]'
+        within_s: 15
+      - match: 'category == "network" and syscall_name == "connect"'
+        within_s: 30
+    labels:
+      tactic: execution
+      source: deepview.builtin.windows_baseline
