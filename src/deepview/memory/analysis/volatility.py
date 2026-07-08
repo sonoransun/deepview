@@ -55,7 +55,8 @@ class VolatilityEngine(AnalysisEngine):
             raise RuntimeError("Volatility 3 is not available")
 
         vol3 = self._vol3
-        from volatility3.framework import contexts, automagic
+        from volatility3 import framework
+        from volatility3.framework import automagic, contexts, interfaces
         from volatility3.framework.plugins import construct_plugin
 
         # Create a fresh context
@@ -66,18 +67,37 @@ class VolatilityEngine(AnalysisEngine):
             single_location = "file://" + str(layer._path)
             ctx.config["automagic.LayerStacker.single_location"] = single_location
 
-        # Run automagics
-        available_automagics = automagic.available(ctx)
-        automagics_list = automagic.choose_automagic(available_automagics,
-                                                       vol3.plugins.__name__ + "." + plugin_name)
+        # Resolve the plugin *class* (construct_plugin requires the type, not a
+        # name string). Accept both bare ("pslist") and fully-qualified names.
+        fq_name = plugin_name if "." in plugin_name else vol3.plugins.__name__ + "." + plugin_name
+        framework.import_files(vol3.plugins, True)
+        plugin_classes = {
+            p.__module__ + "." + p.__name__: p
+            for p in interfaces.plugins.PluginInterface.get_children()
+        }
+        plugin_cls = plugin_classes.get(fq_name)
+        if plugin_cls is None:
+            # Fall back to a suffix match on the short name (e.g. ".pslist").
+            suffix = "." + plugin_name.rsplit(".", 1)[-1]
+            matches = [cls for name, cls in plugin_classes.items() if name.endswith(suffix)]
+            if len(matches) == 1:
+                plugin_cls = matches[0]
+        if plugin_cls is None:
+            raise RuntimeError(f"Volatility 3 plugin not found: {plugin_name}")
 
-        # Construct and run the plugin
-        plugin = construct_plugin(ctx, automagics_list,
-                                   vol3.plugins.__name__ + "." + plugin_name,
-                                   None, None, None)
+        # Apply caller-supplied options to the plugin's config subtree.
+        base_config_path = "plugins"
+        plugin_config_path = interfaces.configuration.path_join(base_config_path, plugin_cls.__name__)
+        for key, value in kwargs.items():
+            ctx.config[interfaces.configuration.path_join(plugin_config_path, key)] = value
+
+        # Run automagics against the resolved plugin, then construct and run it.
+        available_automagics = automagic.available(ctx)
+        automagics_list = automagic.choose_automagic(available_automagics, plugin_cls)
+        plugin = construct_plugin(ctx, automagics_list, plugin_cls, base_config_path, None, None)
 
         result = plugin.run()
-        log.info("plugin_completed", plugin=plugin_name)
+        log.info("plugin_completed", plugin=fq_name)
         return result
 
     def list_plugins(self) -> list[str]:
@@ -86,12 +106,14 @@ class VolatilityEngine(AnalysisEngine):
             return []
 
         try:
-            import volatility3.framework.plugins
+            from volatility3 import framework
             from volatility3.framework import interfaces
 
-            failures = volatility3.framework.import_files(volatility3.plugins, True)
+            framework.import_files(self._vol3.plugins, True)
+            # Plugin classes are not orderable; sort by fully-qualified name.
             plugin_list = sorted(
-                interfaces.plugins.PluginInterface.get_children()
+                interfaces.plugins.PluginInterface.get_children(),
+                key=lambda p: p.__module__ + "." + p.__name__,
             )
             return [p.__module__ + "." + p.__name__ for p in plugin_list]
         except Exception as e:

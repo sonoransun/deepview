@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -63,6 +64,17 @@ class EventCategory(str, enum.Enum):
     NAMESPACE = "namespace"
     AUDIT = "audit"
     CLASSIFICATION = "classification"
+    # Enriched semantic categories emitted by the event factories
+    # (see ``deepview.tracing.events``) and consumed by the ES backend,
+    # eBPF decoders, and the timeline trace-events source.
+    PROCESS_EXEC = "process_exec"
+    PROCESS_FORK = "process_fork"
+    FILE_ACCESS = "file_access"
+    PTRACE = "ptrace"
+    MEMORY_MAP = "memory_map"
+    MODULE_LOAD = "module_load"
+    BPF_LOAD = "bpf_load"
+    CREDENTIAL = "credential"
 
 
 class EventSeverity(str, enum.Enum):
@@ -96,15 +108,67 @@ class DisassemblyBackend(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 
+class ThreadInfo(BaseModel):
+    """A thread within a process (start address powers RWX-injection heuristics)."""
+    tid: int = 0
+    start_address: int = 0
+    stack_base: int = 0
+    state: str = ""
+
+
+class SigningInfo(BaseModel):
+    """Code-signing provenance for an executable (macOS ES / PE Authenticode)."""
+    signed: bool = False
+    team_id: str = ""
+    signer: str = ""
+    verified: bool = False
+
+
+class NamespaceSet(BaseModel):
+    """Linux namespace inode numbers for a process (from ``/proc/<pid>/ns``)."""
+    mnt: int | None = None
+    pid: int | None = None
+    net: int | None = None
+    user: int | None = None
+    uts: int | None = None
+    ipc: int | None = None
+    cgroup: int | None = None
+    time: int | None = None
+
+
 class ProcessContext(BaseModel):
     pid: int
-    tid: int
-    ppid: int
-    uid: int
-    gid: int
-    comm: str
+    tid: int = 0
+    ppid: int = 0
+    uid: int = 0
+    gid: int = 0
+    comm: str = ""
     exe_path: str = ""
     cgroup: str = ""
+    cgroup_path: str = ""
+    cmdline: list[str] = Field(default_factory=list)
+    cwd: str = ""
+    exe_hash_sha256: str = ""
+    exe_signing: SigningInfo | None = None
+    auid: int | None = None
+    tty: str = ""
+    integrity_level: str = ""
+    selinux_context: str = ""
+    container_id: str = ""
+    k8s_pod: str = ""
+    k8s_namespace: str = ""
+    namespaces: NamespaceSet | None = None
+    threads: list[ThreadInfo] = Field(default_factory=list)
+    loaded_modules: list[Any] = Field(default_factory=list)
+
+    def stable_key(self, boot_ns: int | None = None) -> str:
+        """Correlation-graph identity for this process.
+
+        The optional *boot_ns* (process start time in boot-relative ns)
+        disambiguates recycled PIDs across a capture.
+        """
+        base = f"process:{self.pid}"
+        return f"{base}@{boot_ns}" if boot_ns is not None else base
 
 
 class EventSource(BaseModel):
@@ -133,7 +197,16 @@ class AcquisitionResult(BaseModel):
     format: DumpFormat
     size_bytes: int = 0
     duration_seconds: float = 0.0
-    hash_sha256: str = ""
+    hash_sha256: str = ""  # digest value (algorithm named below)
+    # Provenance / chain-of-custody
+    algorithm: str = "sha256"
+    acquired_at: str = ""  # UTC ISO-8601
+    tool_version: str = ""
+    # Completeness / integrity
+    truncated: bool = False
+    bytes_expected: int = 0  # 0 = unknown
+    read_error: str = ""
+    manifest_path: Path | None = None
 
 
 class PluginMetadata(BaseModel):

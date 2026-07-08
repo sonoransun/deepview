@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import enum
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -77,16 +78,23 @@ class TimelineEvent(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class TimelineEntry(BaseModel):
-    """Legacy shim; new code should use :class:`TimelineEvent`."""
+@dataclass
+class TimelineEntry:
+    """Legacy timeline row; new code should use :class:`TimelineEvent`.
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    Kept as a dataclass (not a Pydantic model) so callers can build it
+    positionally — ``TimelineEntry(ts, "exec", "desc", "trace", "critical")``
+    — and omit the timestamp (it defaults to *now*), matching the flat
+    ``reporting/timeline.py`` module this package superseded.
+    """
+
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: str = ""
     description: str = ""
     source: str = ""
     severity: str = "info"
     pid: int = 0
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_timeline_event(self) -> TimelineEvent:
         return TimelineEvent(

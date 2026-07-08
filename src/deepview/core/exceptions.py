@@ -61,6 +61,14 @@ class FormatError(AnalysisError):
     """Unsupported or invalid dump format."""
 
 
+class EntityNotFoundError(AnalysisError):
+    """A correlation-graph entity was referenced but does not exist."""
+
+    def __init__(self, entity_id: str) -> None:
+        self.entity_id = entity_id
+        super().__init__(f"Entity not found in correlation graph: {entity_id!r}")
+
+
 # -- Monitoring --------------------------------------------------------------
 
 class MonitorError(DeepViewError):
@@ -165,6 +173,10 @@ class HardwareError(DeepViewError):
 
 class BaselineError(DeepViewError):
     """Baseline profiling or comparison failure."""
+
+
+class SnapshotStoreError(BaselineError):
+    """A baseline snapshot could not be persisted or retrieved."""
 
 
 # -- Disassembly / Reverse Engineering --------------------------------------

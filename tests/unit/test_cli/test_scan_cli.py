@@ -45,12 +45,14 @@ def test_rules_list_reports_rule_files(tmp_path) -> None:
 
 
 def test_rules_list_empty_dir(tmp_path) -> None:
+    # An empty/missing user rules dir still surfaces the builtin rule sets;
+    # the command lists rule *sets* (builtin + user), not just user files.
     ctx = AnalysisContext.for_testing()
     ctx.config.memory.yara_rules_dir = tmp_path / "missing"
     runner, root = _make_runner(ctx)
     result = runner.invoke(root, ["scan", "rules"])
     assert result.exit_code == 0, result.output
-    assert "No rule files found" in result.output
+    assert "rule sets" in result.output.lower()
 
 
 def test_ioc_matches_indicator_in_file(tmp_path) -> None:

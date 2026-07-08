@@ -43,7 +43,7 @@ def run():
     result = decomp.decompileFunction(func, 60, getMonitor())  # noqa: F821
 
     source = ""
-    if result and result.depiledFunction():
+    if result and result.decompileCompleted():
         source = result.getDecompiledFunction().getC()
 
     with open(output_path, "w") as f:

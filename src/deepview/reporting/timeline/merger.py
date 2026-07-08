@@ -8,11 +8,16 @@ for backwards compatibility.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Iterator, Protocol
 
 from deepview.core.logging import get_logger
-from deepview.reporting.timeline.event import Severity, SourceType, TimelineEvent
+from deepview.reporting.timeline.event import (
+    Severity,
+    SourceType,
+    TimelineEntry,
+    TimelineEvent,
+)
 
 log = get_logger("reporting.timeline.merger")
 
@@ -130,40 +135,118 @@ def _max_severity(a: Severity, b: Severity) -> Severity:
 
 
 class TimelineBuilder:
-    """Legacy API that accepts raw ``TimelineEntry`` objects."""
+    """Legacy builder over flat :class:`TimelineEntry` rows.
+
+    This is the drop-in replacement for the old ``reporting/timeline.py``
+    ``TimelineBuilder``: it stores raw ``TimelineEntry`` objects (string
+    ``source``/``severity``, wall-clock ``timestamp``) and exposes the
+    build / aggregation surface the CLI ``report timeline`` command, the
+    HTML report visuals, and third-party callers rely on. New multi-source
+    work should use :class:`TimelineMerger` + :class:`TimelineEvent`.
+    """
 
     def __init__(self) -> None:
-        self._events: list[TimelineEvent] = []
+        self._entries: list[TimelineEntry] = []
 
-    def add_entry(self, entry) -> None:  # type: ignore[no-untyped-def]
-        from deepview.reporting.timeline.event import TimelineEntry
+    def add_entry(self, entry: TimelineEntry) -> None:
+        # Accept a rich TimelineEvent too, downgrading it to the flat shape.
+        if isinstance(entry, TimelineEvent):
+            entry = TimelineEntry(
+                timestamp=entry.timestamp_utc,
+                event_type=entry.source.value,
+                description=entry.description,
+                source=entry.source.value,
+                severity=entry.severity.value,
+                pid=entry.pid,
+                metadata=dict(entry.raw),
+            )
+        self._entries.append(entry)
 
-        if isinstance(entry, TimelineEntry):
-            self._events.append(entry.to_timeline_event())
-        elif isinstance(entry, TimelineEvent):
-            self._events.append(entry)
-        else:
-            raise TypeError(f"Unsupported entry type: {type(entry).__name__}")
-
-    def add_entries(self, entries: Iterable[Any]) -> None:
+    def add_entries(self, entries: Iterable[TimelineEntry]) -> None:
         for e in entries:
             self.add_entry(e)
 
-    def build(self) -> list[TimelineEvent]:
-        return sorted(self._events, key=lambda e: e.timestamp_utc)
+    def build(self) -> list[TimelineEntry]:
+        """Return entries sorted by timestamp."""
+        return sorted(self._entries, key=lambda e: e.timestamp)
 
     def to_dict_list(self) -> list[dict[str, Any]]:
-        return [e.model_dump(mode="json") for e in self.build()]
+        return [
+            {
+                "timestamp": e.timestamp.isoformat(),
+                "event_type": e.event_type,
+                "description": e.description,
+                "source": e.source,
+                "severity": e.severity,
+                "pid": e.pid,
+            }
+            for e in self.build()
+        ]
 
     @property
     def entry_count(self) -> int:
-        return len(self._events)
+        return len(self._entries)
 
-    def filter_by_pid(self, pid: int) -> list[TimelineEvent]:
+    def filter_by_pid(self, pid: int) -> list[TimelineEntry]:
         return [e for e in self.build() if e.pid == pid]
 
-    def filter_by_source(self, source: str) -> list[TimelineEvent]:
-        return [e for e in self.build() if e.source.value == source]
+    def filter_by_source(self, source: str) -> list[TimelineEntry]:
+        return [e for e in self.build() if e.source == source]
 
-    def filter_by_severity(self, severity: str) -> list[TimelineEvent]:
-        return [e for e in self.build() if e.severity.value == severity]
+    def filter_by_severity(self, severity: str) -> list[TimelineEntry]:
+        return [e for e in self.build() if e.severity == severity]
+
+    # ------------------------------------------------------------------
+    # Aggregation (powers the CLI swimlane and the HTML report timeline)
+    # ------------------------------------------------------------------
+
+    def span(self) -> tuple[datetime, datetime] | None:
+        """Earliest and latest entry timestamps, or ``None`` when empty."""
+        ordered = self.build()
+        if not ordered:
+            return None
+        return ordered[0].timestamp, ordered[-1].timestamp
+
+    def bucketed(self, bucket_s: float) -> list[tuple[datetime, int]]:
+        """Count entries per fixed-width time bucket across the full span."""
+        if bucket_s <= 0:
+            raise ValueError("bucket_s must be positive")
+        span = self.span()
+        if span is None:
+            return []
+        start, end = span
+        step = timedelta(seconds=bucket_s)
+        buckets: list[tuple[datetime, int]] = []
+        ordered = self.build()
+        edge = start
+        idx = 0
+        max_buckets = 100_000  # guard against pathological spans
+        while edge <= end and len(buckets) < max_buckets:
+            nxt = edge + step
+            count = 0
+            while idx < len(ordered) and ordered[idx].timestamp < nxt:
+                count += 1
+                idx += 1
+            buckets.append((edge, count))
+            edge = nxt
+        return buckets
+
+    def gaps(self, min_gap_s: float) -> list[tuple[datetime, datetime, float]]:
+        """Quiet intervals ``>= min_gap_s`` between consecutive entries."""
+        ordered = self.build()
+        out: list[tuple[datetime, datetime, float]] = []
+        for prev, cur in zip(ordered, ordered[1:]):
+            delta = (cur.timestamp - prev.timestamp).total_seconds()
+            if delta >= min_gap_s:
+                out.append((prev.timestamp, cur.timestamp, delta))
+        return out
+
+    def lanes(self, by: str = "source") -> dict[str, list[TimelineEntry]]:
+        """Group sorted entries into lanes keyed by ``source`` or ``severity``."""
+        if by not in ("source", "severity"):
+            raise ValueError("lanes(by=) must be 'source' or 'severity'")
+        lanes: dict[str, list[TimelineEntry]] = {}
+        for entry in self.build():
+            key = getattr(entry, by)
+            lanes.setdefault(str(key), []).append(entry)
+        return lanes

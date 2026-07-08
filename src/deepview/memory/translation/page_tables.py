@@ -188,8 +188,44 @@ class PageTableWalker:
         """Enumerate all valid virtual-to-physical mappings for an address space.
 
         Yields VirtualMapping for every present page found in the page tables.
+        Handles both 4-level and 5-level (LA57) paging: under LA57, CR3 points to
+        the PML5 table, so the PML5 level is walked as the outermost loop and its
+        index contributes bits 56:48 of each virtual address.
         """
-        pml4_base = cr3 & _PHYS_ADDR_MASK_4K
+        top_base = cr3 & _PHYS_ADDR_MASK_4K
+        sign_bits = 57 if self._five_level else 48
+
+        if not self._five_level:
+            yield from self._walk_pml4(top_base, 0, None, sign_bits)
+            return
+
+        for pml5_idx in range(512):
+            try:
+                pml5e = self._read_entry(top_base + pml5_idx * 8)
+            except TranslationError:
+                continue
+            if not (pml5e & _PRESENT):
+                continue
+            pml4_base = pml5e & _PHYS_ADDR_MASK_4K
+            yield from self._walk_pml4(pml4_base, pml5_idx << 48, pml5e, sign_bits)
+
+    def _walk_pml4(
+        self,
+        pml4_base: int,
+        va_high: int,
+        pml5e: int | None,
+        sign_bits: int,
+    ) -> Iterator[VirtualMapping]:
+        """Walk a PML4 table (and lower levels), yielding present mappings.
+
+        *va_high* carries the PML5 index bits (0 under 4-level paging); *pml5e* is
+        the owning PML5 entry (``None`` under 4-level) so its permission bits fold
+        into every emitted mapping.
+        """
+        # Fold the PML5 entry's permissions (identity for 4-level paging).
+        p5_w = pml5e is None or bool(pml5e & _WRITABLE)
+        p5_u = pml5e is None or bool(pml5e & _USER)
+        p5_nx = pml5e is not None and bool(pml5e & _NX)
 
         for pml4_idx in range(512):
             try:
@@ -200,7 +236,7 @@ class PageTableWalker:
                 continue
 
             pdpt_base = pml4e & _PHYS_ADDR_MASK_4K
-            va_pml4 = _sign_extend(pml4_idx << 39, 48)
+            va_pml4 = _sign_extend(va_high | (pml4_idx << 39), sign_bits)
 
             for pdpt_idx in range(512):
                 try:
@@ -218,9 +254,9 @@ class PageTableWalker:
                         virtual_start=va_pdpt,
                         physical_start=pdpte & _PHYS_ADDR_MASK_1G,
                         size=PAGE_1G,
-                        writable=bool(pml4e & _WRITABLE and pdpte & _WRITABLE),
-                        user=bool(pml4e & _USER and pdpte & _USER),
-                        no_execute=bool(pml4e & _NX or pdpte & _NX),
+                        writable=bool(p5_w and pml4e & _WRITABLE and pdpte & _WRITABLE),
+                        user=bool(p5_u and pml4e & _USER and pdpte & _USER),
+                        no_execute=bool(p5_nx or pml4e & _NX or pdpte & _NX),
                         level=3,
                     )
                     continue
@@ -243,15 +279,16 @@ class PageTableWalker:
                             physical_start=pde & _PHYS_ADDR_MASK_2M,
                             size=PAGE_2M,
                             writable=bool(
-                                pml4e & _WRITABLE
+                                p5_w
+                                and pml4e & _WRITABLE
                                 and pdpte & _WRITABLE
                                 and pde & _WRITABLE
                             ),
                             user=bool(
-                                pml4e & _USER and pdpte & _USER and pde & _USER
+                                p5_u and pml4e & _USER and pdpte & _USER and pde & _USER
                             ),
                             no_execute=bool(
-                                pml4e & _NX or pdpte & _NX or pde & _NX
+                                p5_nx or pml4e & _NX or pdpte & _NX or pde & _NX
                             ),
                             level=2,
                         )
@@ -272,19 +309,22 @@ class PageTableWalker:
                             physical_start=pte & _PHYS_ADDR_MASK_4K,
                             size=PAGE_4K,
                             writable=bool(
-                                pml4e & _WRITABLE
+                                p5_w
+                                and pml4e & _WRITABLE
                                 and pdpte & _WRITABLE
                                 and pde & _WRITABLE
                                 and pte & _WRITABLE
                             ),
                             user=bool(
-                                pml4e & _USER
+                                p5_u
+                                and pml4e & _USER
                                 and pdpte & _USER
                                 and pde & _USER
                                 and pte & _USER
                             ),
                             no_execute=bool(
-                                pml4e & _NX
+                                p5_nx
+                                or pml4e & _NX
                                 or pdpte & _NX
                                 or pde & _NX
                                 or pte & _NX

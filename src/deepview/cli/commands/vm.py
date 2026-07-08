@@ -56,7 +56,7 @@ def list_vms(ctx: click.Context, hypervisor: str) -> None:
     available = manager.available_connectors
     if not available:
         console.print(
-            "[yellow]No VM connector available. VM introspection requires a "
+            "[yellow]No VM connector available. VM introspection needs a "
             "hypervisor (libvirt, VirtualBox, or VMware). "
             "Run 'deepview doctor' to check.[/yellow]"
         )

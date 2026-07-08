@@ -111,13 +111,12 @@ def doctor(ctx):
     """Check system capabilities and available tools."""
     context: AnalysisContext = ctx.obj["context"]
     console: Console = ctx.obj["console"]
-    from rich.table import Table
 
     console.print(f"\n[bold]Platform:[/bold] {context.platform.os.value}")
     console.print(f"[bold]Architecture:[/bold] {context.platform.arch}")
     console.print(f"[bold]Kernel:[/bold] {context.platform.kernel_version}")
 
-    console.print(f"\n[bold]Capabilities:[/bold]")
+    console.print("\n[bold]Capabilities:[/bold]")
     if context.platform.capabilities:
         for cap in sorted(context.platform.capabilities):
             console.print(f"  [green]✓[/green] {cap}")
@@ -137,7 +136,7 @@ def doctor(ctx):
         "virsh": "virsh",
     }
 
-    console.print(f"\n[bold]External Tools:[/bold]")
+    console.print("\n[bold]External Tools:[/bold]")
     for name, cmd in tools.items():
         if cmd is None:
             try:
@@ -206,3 +205,20 @@ def doctor(ctx):
         except ImportError:
             suffix = f" [dim]({note})[/dim]" if note else ""
             console.print(f"  [red]✗[/red] {name} — {desc}{suffix}")
+
+    # Honest capability accounting: some subsystems have config scaffolding but
+    # no implementation. Surfacing this prevents an investigator from reading a
+    # clean/empty result as "no threat" when the check was never actually run.
+    console.print("\n[bold]Advertised capabilities NOT implemented in this build:[/bold]")
+    not_implemented = [
+        "Hardware-assisted acquisition (PCILeech/DMA, cold boot, JTAG, chip-off, SPI, GPU VRAM)",
+        "Firmware/UEFI implant, PatchGuard, hypervisor-rootkit, and driver-signature detection",
+        "Side-channel / Intel PT / ARM CoreSight execution trace",
+        "Live VM introspection (LibVMI/DRAKVUF)",
+    ]
+    for label in not_implemented:
+        console.print(f"  [yellow]![/yellow] {label}")
+    console.print(
+        "  [dim]A clean result from these does not imply absence of threats. "
+        "Boot-sector (bootkit) integrity IS available via 'deepview scan bootkit'.[/dim]"
+    )

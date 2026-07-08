@@ -1,5 +1,7 @@
 """Indicator of Compromise matching engine."""
 from __future__ import annotations
+import hashlib
+import hmac
 import re
 import json
 from dataclasses import dataclass, field
@@ -65,17 +67,30 @@ class IndicatorEngine:
         return matches
 
     def scan_bytes(self, data: bytes, offset: int = 0) -> list[IndicatorMatch]:
-        """Scan binary data for IoC matches."""
+        """Scan a binary artifact for IoC matches.
+
+        Hash indicators are matched by hashing the *content* of ``data`` and
+        comparing to the indicator digest (constant-time) -- not by searching for
+        the hex digest string inside the bytes, which both missed real matches
+        and produced false positives when a digest string happened to appear.
+        """
         matches = []
-        text = data.decode("utf-8", errors="replace")
+        digest_cache: dict[str, str] = {}
         for ioc in self._indicators:
             if ioc.ioc_type in ("hash_md5", "hash_sha256"):
-                if ioc.value.lower() in text.lower():
-                    idx = text.lower().find(ioc.value.lower())
+                algo = "md5" if ioc.ioc_type == "hash_md5" else "sha256"
+                if algo not in digest_cache:
+                    if algo == "md5":
+                        # md5 is used only to match known-bad threat-intel hashes,
+                        # not for evidence integrity.
+                        digest_cache[algo] = hashlib.md5(data, usedforsecurity=False).hexdigest()
+                    else:
+                        digest_cache[algo] = hashlib.sha256(data).hexdigest()
+                if hmac.compare_digest(digest_cache[algo], ioc.value.strip().lower()):
                     matches.append(IndicatorMatch(
                         indicator=ioc,
-                        found_at="binary_match",
-                        offset=offset + idx,
+                        found_at="content_hash",
+                        offset=offset,
                     ))
             elif ioc.ioc_type in ("string", "url", "domain", "ip", "mutex"):
                 value_bytes = ioc.value.encode("utf-8")

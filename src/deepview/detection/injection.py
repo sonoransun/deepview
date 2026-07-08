@@ -1,6 +1,5 @@
 """Process injection detection covering MITRE T1055 sub-techniques."""
 from __future__ import annotations
-from dataclasses import dataclass, field
 from deepview.core.logging import get_logger
 from deepview.core.types import EventSeverity
 from deepview.detection.anti_forensics import Detection
@@ -27,8 +26,24 @@ INJECTION_TECHNIQUES = {
 class InjectionDetector:
     """Detect process injection techniques in memory."""
 
+    # T1055 sub-techniques with an actual detector in this module. The module
+    # advertises the full INJECTION_TECHNIQUES catalog, so coverage() exposes the
+    # gap honestly rather than implying full coverage to an investigator.
+    IMPLEMENTED_TECHNIQUES = frozenset({"T1055", "T1055.003", "T1055.012"})
+
     def __init__(self):
         self._detections: list[Detection] = []
+
+    @classmethod
+    def coverage(cls) -> dict[str, list[str]]:
+        """Honest accounting of advertised vs. actually-implemented techniques."""
+        advertised = set(INJECTION_TECHNIQUES) | {"T1055"}
+        implemented = set(cls.IMPLEMENTED_TECHNIQUES)
+        return {
+            "advertised": sorted(advertised),
+            "implemented": sorted(implemented),
+            "not_implemented": sorted(advertised - implemented),
+        }
 
     def detect_hollow_processes(self, processes: list[dict]) -> list[Detection]:
         """Detect process hollowing (T1055.012).
@@ -69,13 +84,21 @@ class InjectionDetector:
             protection = vad.get("protection", "")
             is_private = vad.get("private", False)
             has_file = vad.get("file_object", None)
+            is_exec = "EXECUTE" in protection
+            is_write = "WRITE" in protection
 
-            if "EXECUTE" in protection and "WRITE" in protection and not has_file and is_private:
+            # Executable, private, and not backed by an image file is the core
+            # signal. RWX is the classic case; a non-writable executable private
+            # region catches the RW->RX loader pattern (Cobalt Strike and many
+            # injectors flip protections after writing) that an RWX-only check misses.
+            if is_exec and is_private and not has_file:
+                kind = "RWX" if is_write else "executable (RW->RX loader pattern)"
                 detections.append(Detection(
                     name="INJECTED_CODE",
                     severity=EventSeverity.WARNING,
                     description=(
-                        f"Suspicious RWX memory at {hex(vad.get('start', 0))}-{hex(vad.get('end', 0))} "
+                        f"Suspicious {kind} private memory at "
+                        f"{hex(vad.get('start', 0))}-{hex(vad.get('end', 0))} "
                         f"in PID {vad.get('pid', '?')} ({vad.get('process', '?')})"
                     ),
                     pid=vad.get("pid", 0),

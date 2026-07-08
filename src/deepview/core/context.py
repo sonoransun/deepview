@@ -7,6 +7,7 @@ from deepview.core.events import EventBus
 from deepview.core.platform import PlatformInfo
 
 if TYPE_CHECKING:
+    from deepview.core.correlation.engine import CorrelationEngine
     from deepview.core.findings import Finding
     from deepview.instrumentation.manager import InstrumentationManager
     from deepview.offload.engine import OffloadEngine
@@ -77,6 +78,7 @@ class AnalysisContext:
         self._unlock_orchestrator: UnlockOrchestrator | None = None
         self._vm_manager: VMManager | None = None
         self._instrumentation_manager: InstrumentationManager | None = None
+        self._correlation_engine: CorrelationEngine | None = None
 
     @property
     def plugins(self) -> PluginRegistry:
@@ -119,6 +121,15 @@ class AnalysisContext:
             from deepview.instrumentation.manager import InstrumentationManager
             self._instrumentation_manager = InstrumentationManager(self)
         return self._instrumentation_manager
+
+    @property
+    def correlation(self) -> CorrelationEngine:
+        if self._correlation_engine is None:
+            from deepview.core.correlation.engine import CorrelationEngine
+            engine = CorrelationEngine(event_bus=self.events)
+            engine.register_default_rules()
+            self._correlation_engine = engine
+        return self._correlation_engine
 
     def add_finding(self, finding: Finding) -> None:
         """Record a forensic finding and publish a :class:`FindingEvent`.

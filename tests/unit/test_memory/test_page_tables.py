@@ -6,14 +6,13 @@ import struct
 import pytest
 
 from deepview.core.exceptions import TranslationError
-from deepview.core.types import LayerMetadata, ScanResult
+from deepview.core.types import LayerMetadata
 from deepview.interfaces.layer import DataLayer
 from deepview.memory.translation.page_tables import (
     PAGE_2M,
     PAGE_4K,
     PAGE_1G,
     PageTableWalker,
-    VirtualMapping,
     _sign_extend,
 )
 from deepview.memory.translation.virtual_layer import VirtualAddressLayer
@@ -239,6 +238,42 @@ class TestPageTableWalker:
         assert len(mappings) == 2
         assert mappings[1].virtual_start == 0x1000
         assert mappings[1].physical_start == second_page
+
+    def test_walk_all_mappings_la57(self):
+        """Under LA57, CR3 points to the PML5 table; enumeration must descend it."""
+        layer = FakePhysicalLayer()
+        pml5_addr = 0x1000
+        pml4_addr = 0x7000
+        pdpt_addr = 0x2000
+        pd_addr = 0x3000
+        pt_addr = 0x4000
+        data_addr = 0x5000
+        # PML5[1] -> PML4 (index 1 so its bits appear in the virtual address)
+        layer.write_u64(pml5_addr + 1 * 8, pml4_addr | PRESENT | WRITABLE | USER)
+        layer.write_u64(pml4_addr + 0 * 8, pdpt_addr | PRESENT | WRITABLE | USER)
+        layer.write_u64(pdpt_addr + 0 * 8, pd_addr | PRESENT | WRITABLE | USER)
+        layer.write_u64(pd_addr + 0 * 8, pt_addr | PRESENT | WRITABLE | USER)
+        layer.write_u64(pt_addr + 0 * 8, data_addr | PRESENT | WRITABLE | USER)
+
+        walker = PageTableWalker(layer, five_level=True)
+        mappings = list(walker.walk_all_mappings(pml5_addr))
+        assert len(mappings) == 1
+        assert mappings[0].virtual_start == (1 << 48)
+        assert mappings[0].physical_start == data_addr
+        assert mappings[0].size == PAGE_4K
+
+        # translate() must agree with enumeration on the same virtual address.
+        result = walker.translate(pml5_addr, 1 << 48)
+        assert result.physical_address == data_addr
+
+    def test_walk_4level_does_not_descend_pml5(self):
+        """A 4-level walker must not treat CR3 as a PML5 table."""
+        layer = FakePhysicalLayer()
+        cr3 = _build_simple_4k_mapping(layer)
+        walker = PageTableWalker(layer, five_level=False)
+        mappings = list(walker.walk_all_mappings(cr3))
+        assert len(mappings) == 1
+        assert mappings[0].virtual_start == 0
 
 
 class TestVirtualAddressLayer:

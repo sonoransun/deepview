@@ -39,8 +39,8 @@ def yara(ctx: click.Context, target: str, rules: str) -> None:
     scanner = YaraScanner()
     if not scanner.is_available:
         console.print(
-            "[yellow]yara-python is not installed. "
-            "Install with: pip install 'deepview[memory]'[/yellow]"
+            "[yellow]yara-python not installed. "
+            r"Install with: pip install 'deepview\[memory]'[/yellow]"
         )
         raise click.Abort()
     try:
@@ -132,20 +132,59 @@ def rules(ctx: click.Context, list_rules: bool, update: bool) -> None:
     context = ctx.obj["context"]
     from deepview.scanning.rules.manager import RuleManager
 
-    mgr = RuleManager(context.config)
+    rm = RuleManager(context.config)
+
     if update:
+        rules_dir = rm.ensure_rules_dir()
         console.print(
-            "[yellow]Automatic rule update is not implemented; drop .yar/.yara "
-            f"files into {mgr.rules_dir} manually.[/yellow]"
+            "[yellow]No remote rule feed is configured; drop .yar files into the "
+            "user rules directory to add rule sets.[/yellow]"
         )
+        console.print(f"  User rules dir: {rules_dir}")
         return
 
-    names = mgr.list_rules()
-    console.print(f"[bold]Rules directory:[/bold] {mgr.rules_dir}")
-    table = Table(title="YARA rules", min_width=20)
+    # Default action (and --list): show available rule sets.
+    rule_sets = rm.list_rule_sets()
+
+    table = Table(title=f"Available rule sets ({len(rule_sets)})")
     table.add_column("Name", style="cyan")
-    for name in names:
-        table.add_row(name)
+    table.add_column("Source")
+    table.add_column("Path")
+    for rs in rule_sets:
+        table.add_row(rs["name"], rs["source"], rs["path"])
     console.print(table)
-    if not names:
-        console.print("[dim]No rule files found.[/dim]")
+    if not rule_sets:
+        console.print("[dim]  No rule sets found.[/dim]")
+
+
+@scan.command()
+@click.option("--image", "-i", type=click.Path(exists=True), required=True, help="Disk image (reads first sector)")
+@click.option("--known-good", type=click.Path(exists=True), default=None, help="Known-good MBR template to diff against")
+@click.pass_context
+def bootkit(ctx, image, known_good):
+    """Check boot-sector (MBR/VBR) integrity for bootkit tampering (T1542.003)."""
+    console = ctx.obj["console"]
+    console.print(f"[bold]Boot-sector scan: {image}[/bold]")
+
+    from deepview.detection.rootkit import BootkitDetector
+
+    detector = BootkitDetector()
+    try:
+        detections = detector.analyze_image(
+            Path(image), Path(known_good) if known_good else None
+        )
+    except Exception as e:
+        console.print(f"[red]Bootkit scan error: {e}[/red]")
+        raise SystemExit(1)
+
+    if not detections:
+        console.print(f"[green]No boot-sector anomalies detected in {image}.[/green]")
+        return
+
+    table = Table(title=f"Boot-sector findings ({len(detections)})")
+    table.add_column("Severity", style="cyan")
+    table.add_column("Technique")
+    table.add_column("Description")
+    for d in detections:
+        table.add_row(d.severity.value, d.technique, d.description)
+    console.print(table)

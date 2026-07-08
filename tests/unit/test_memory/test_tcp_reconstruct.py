@@ -3,13 +3,10 @@ from __future__ import annotations
 
 import struct
 
-import pytest
-
 from deepview.core.types import LayerMetadata
 from deepview.interfaces.layer import DataLayer
 from deepview.memory.network.tcp_reconstruct import (
     POOL_TAG_TCPE,
-    POOL_TAG_TCPL,
     POOL_TAG_UDPA,
     NetworkConnection,
     TCPStackReconstructor,
@@ -59,6 +56,7 @@ def _build_windows_tcp_endpoint(
     remote_port: int,
     state: int,
     pid: int,
+    af: int = 2,
 ) -> bytes:
     """Build a synthetic Windows TcpE pool-tagged structure.
 
@@ -69,8 +67,8 @@ def _build_windows_tcp_endpoint(
     buf[0:4] = POOL_TAG_TCPE
     # Structure starts at +0x10
     struct_off = 0x10
-    # AF_INET at +0x18
-    struct.pack_into("<H", buf, struct_off + 0x18, 2)
+    # Address family at +0x18 (AF_INET=2, AF_INET6=23)
+    struct.pack_into("<H", buf, struct_off + 0x18, af)
     # Local port (big-endian) at +0x1C
     struct.pack_into(">H", buf, struct_off + 0x1C, local_port)
     # Remote port (big-endian) at +0x20
@@ -176,6 +174,35 @@ class TestWindowsPoolTagScanning:
 
         connections = recon.extract_connections(os_hint="windows")
         assert len(connections) >= 2
+
+    def test_ipv4_endpoint_labeled_and_resolved(self):
+        endpoint = _build_windows_tcp_endpoint(
+            (192, 168, 1, 100), 443, (10, 0, 0, 1), 54321, 4, 1234, af=2
+        )
+        data = b"\x00" * 256 + endpoint + b"\x00" * 256
+        recon = TCPStackReconstructor(FakeLayer(data))
+        conn = recon.extract_connections(os_hint="windows")[0]
+        assert conn.family == "ipv4"
+        assert conn.local_addr == "192.168.1.100"
+        assert conn.remote_addr == "10.0.0.1"
+
+    def test_ipv6_endpoint_not_fabricated_as_ipv4(self):
+        """AF_INET6 endpoints must be labeled ipv6 and not report a bogus IPv4."""
+        endpoint = _build_windows_tcp_endpoint(
+            (0xDE, 0xAD, 0xBE, 0xEF), 443, (0xCA, 0xFE, 0xBA, 0xBE), 54321, 4, 1234, af=23
+        )
+        data = b"\x00" * 256 + endpoint + b"\x00" * 256
+        recon = TCPStackReconstructor(FakeLayer(data))
+        conns = recon.extract_connections(os_hint="windows")
+        assert len(conns) >= 1
+        conn = conns[0]
+        assert conn.family == "ipv6"
+        # Ports/state/pid still parse; addresses are not fabricated IPv4 values.
+        assert conn.local_port == 443
+        assert conn.pid == 1234
+        assert conn.local_addr == "::"
+        assert conn.remote_addr == "::"
+        assert "222.173" not in conn.local_addr  # would be the bogus IPv4 of 0xDEAD...
 
     def test_invalid_af_ignored(self):
         """Structures with non-AF_INET family should be skipped."""

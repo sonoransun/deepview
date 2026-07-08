@@ -1,10 +1,7 @@
 """Tests for deepview.detection.injection module."""
 from __future__ import annotations
 
-import pytest
-
 from deepview.core.types import EventSeverity
-from deepview.detection.anti_forensics import Detection
 from deepview.detection.injection import InjectionDetector
 
 
@@ -84,6 +81,55 @@ class TestDetectInjectedCode:
         ]
         detections = detector.detect_injected_code(vad_entries)
         assert detections == []
+
+    def test_detect_rx_loader_pattern(self):
+        """EXECUTE (no WRITE), private, no file -> RW->RX loader detection."""
+        detector = InjectionDetector()
+        detections = detector.detect_injected_code(
+            [
+                {
+                    "pid": 9,
+                    "process": "loader.exe",
+                    "start": 0x30000,
+                    "end": 0x31000,
+                    "protection": "PAGE_EXECUTE_READ",
+                    "private": True,
+                    "file_object": None,
+                }
+            ]
+        )
+        assert len(detections) == 1
+        assert detections[0].name == "INJECTED_CODE"
+        assert "loader" in detections[0].description.lower()
+
+    def test_executable_file_backed_not_flagged(self):
+        """Executable but image-backed (normal loaded module) -> no detection."""
+        detector = InjectionDetector()
+        detections = detector.detect_injected_code(
+            [
+                {
+                    "pid": 9,
+                    "process": "app",
+                    "start": 0x40000,
+                    "end": 0x41000,
+                    "protection": "PAGE_EXECUTE_READ",
+                    "private": False,
+                    "file_object": "/usr/lib/libc.so",
+                }
+            ]
+        )
+        assert detections == []
+
+
+class TestCoverage:
+    def test_coverage_is_honest(self):
+        cov = InjectionDetector.coverage()
+        assert "T1055.012" in cov["implemented"]
+        assert "T1055.003" in cov["implemented"]
+        # Advertised-but-unimplemented sub-techniques are surfaced, not hidden.
+        assert "T1055.001" in cov["not_implemented"]
+        assert len(cov["implemented"]) < len(cov["advertised"])
+        assert set(cov["implemented"]).isdisjoint(cov["not_implemented"])
 
 
 class TestDetectSuspiciousThreads:

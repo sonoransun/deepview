@@ -442,3 +442,68 @@ class _Parser:
         self._skip_ws()
         if self._pos != len(self._text):
             raise FilterSyntaxError(f"unexpected trailing input at offset {self._pos}")
+
+
+# ---------------------------------------------------------------------------
+# Kernel/backend push-down splitting
+#
+# ``split_for_pushdown`` divides a filter into rules a backend can enforce at
+# the source (kernel BPF map / ES subscription predicate) and the residual
+# rules that must still be evaluated user-side on every delivered event. It is
+# deliberately conservative: only top-level ``and``-chain leaves on supported
+# fields with cheap ops are pushed; anything under ``or``/``not`` is residual.
+# ---------------------------------------------------------------------------
+
+# Fields a typical backend can match cheaply without decoding the full event.
+_DEFAULT_PUSHDOWN_FIELDS: frozenset[str] = frozenset(
+    {"process.pid", "process.uid", "process.gid", "process.comm", "args.path"}
+)
+# Ops a kernel/ES predicate can honour (equality / membership / glob).
+_PUSHABLE_OPS: frozenset[str] = frozenset({"eq", "ne", "in", "glob"})
+
+
+def _collect_rules(node: "FilterExpr | FilterRule") -> list[FilterRule]:
+    """Flatten every leaf :class:`FilterRule` reachable from *node*."""
+    if isinstance(node, FilterRule):
+        return [node]
+    out: list[FilterRule] = []
+    for child in node.children:
+        out.extend(_collect_rules(child))
+    return out
+
+
+def split_for_pushdown(
+    expr: "FilterExpr | FilterRule | None",
+    supported_fields: Iterable[str] | None = None,
+) -> tuple[list[FilterRule], list[FilterRule]]:
+    """Split *expr* into ``(pushed, remaining)`` filter rules.
+
+    *pushed* rules can be enforced at the source; *remaining* rules must be
+    evaluated user-side. When *supported_fields* is ``None`` a conservative
+    default set is used. ``or``/``not`` subtrees cannot be pushed, so all of
+    their leaves land in *remaining*.
+    """
+    if expr is None:
+        return [], []
+    supported = (
+        _DEFAULT_PUSHDOWN_FIELDS if supported_fields is None else set(supported_fields)
+    )
+    if isinstance(expr, FilterRule):
+        node_op, children = "and", [expr]
+    else:
+        node_op, children = expr.op, expr.children
+    if node_op != "and":
+        return [], _collect_rules(expr)
+
+    pushed: list[FilterRule] = []
+    remaining: list[FilterRule] = []
+    for child in children:
+        if (
+            isinstance(child, FilterRule)
+            and child.field_path in supported
+            and child.op in _PUSHABLE_OPS
+        ):
+            pushed.append(child)
+        else:
+            remaining.extend(_collect_rules(child))
+    return pushed, remaining

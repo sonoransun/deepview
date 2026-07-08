@@ -41,6 +41,10 @@ TCP_STATES = {
     11: "DELETE_TCB",
 }
 
+# Address families
+_AF_INET = 2
+_AF_INET6 = 23
+
 # Windows pool tags (ASCII little-endian representation)
 POOL_TAG_TCPE = b"TcpE"  # TCP endpoint
 POOL_TAG_TCPL = b"TcpL"  # TCP listener
@@ -62,6 +66,7 @@ class NetworkConnection:
     state: str
     pid: int
     process_name: str = ""
+    family: str = "ipv4"  # "ipv4" or "ipv6"
     source_offset: int = 0
     metadata: dict = field(default_factory=dict)
 
@@ -195,8 +200,9 @@ class TCPStackReconstructor:
         try:
             # Address family at +0x18 from structure start
             af = struct.unpack_from("<H", data, struct_start + 0x18)[0]
-            if af not in (2, 23):  # AF_INET=2, AF_INET6=23
+            if af not in (_AF_INET, _AF_INET6):
                 return None
+            family = "ipv6" if af == _AF_INET6 else "ipv4"
 
             # Ports are stored in network byte order (big-endian)
             local_port = struct.unpack_from(">H", data, struct_start + 0x1C)[0]
@@ -212,9 +218,9 @@ class TCPStackReconstructor:
             state_val = struct.unpack_from("<I", data, struct_start + 0x38)[0]
             state = TCP_STATES.get(state_val, f"UNKNOWN({state_val})")
 
-            # Try to read local/remote addresses
-            local_addr = self._read_ipv4(data, struct_start + 0x24)
-            remote_addr = self._read_ipv4(data, struct_start + 0x28)
+            local_addr, remote_addr = self._read_endpoint_addrs(
+                data, struct_start + 0x24, struct_start + 0x28, family
+            )
 
             # PID (approximate offset)
             pid = struct.unpack_from("<I", data, struct_start + 0x58)[0]
@@ -229,6 +235,7 @@ class TCPStackReconstructor:
                 remote_port=remote_port,
                 state=state,
                 pid=pid,
+                family=family,
                 source_offset=base + tag_offset,
             )
         except (struct.error, IndexError):
@@ -244,14 +251,17 @@ class TCPStackReconstructor:
 
         try:
             af = struct.unpack_from("<H", data, struct_start + 0x18)[0]
-            if af not in (2, 23):
+            if af not in (_AF_INET, _AF_INET6):
                 return None
+            family = "ipv6" if af == _AF_INET6 else "ipv4"
 
             local_port = struct.unpack_from(">H", data, struct_start + 0x1C)[0]
             if local_port == 0 or local_port > 65535:
                 return None
 
-            local_addr = self._read_ipv4(data, struct_start + 0x24)
+            local_addr = (
+                self._read_ipv4(data, struct_start + 0x24) if family == "ipv4" else "::"
+            )
             pid = struct.unpack_from("<I", data, struct_start + 0x38)[0]
             if pid > 65535:
                 pid = 0
@@ -260,10 +270,11 @@ class TCPStackReconstructor:
                 protocol="tcp",
                 local_addr=local_addr,
                 local_port=local_port,
-                remote_addr="0.0.0.0",
+                remote_addr="::" if family == "ipv6" else "0.0.0.0",
                 remote_port=0,
                 state="LISTEN",
                 pid=pid,
+                family=family,
                 source_offset=base + tag_offset,
             )
         except (struct.error, IndexError):
@@ -279,14 +290,17 @@ class TCPStackReconstructor:
 
         try:
             af = struct.unpack_from("<H", data, struct_start + 0x18)[0]
-            if af not in (2, 23):
+            if af not in (_AF_INET, _AF_INET6):
                 return None
+            family = "ipv6" if af == _AF_INET6 else "ipv4"
 
             local_port = struct.unpack_from(">H", data, struct_start + 0x1C)[0]
             if local_port == 0 or local_port > 65535:
                 return None
 
-            local_addr = self._read_ipv4(data, struct_start + 0x24)
+            local_addr = (
+                self._read_ipv4(data, struct_start + 0x24) if family == "ipv4" else "::"
+            )
             pid = struct.unpack_from("<I", data, struct_start + 0x38)[0]
             if pid > 65535:
                 pid = 0
@@ -299,6 +313,7 @@ class TCPStackReconstructor:
                 remote_port=0,
                 state="",
                 pid=pid,
+                family=family,
                 source_offset=base + tag_offset,
             )
         except (struct.error, IndexError):
@@ -402,6 +417,7 @@ class TCPStackReconstructor:
                     remote_port=dport_be,
                     state=TCP_STATES.get(state, f"UNKNOWN({state})"),
                     pid=0,  # PID requires walking task_struct
+                    family="ipv4",
                     source_offset=base + sk_start,
                 )
             except (struct.error, IndexError, ValueError):
@@ -416,3 +432,16 @@ class TCPStackReconstructor:
         """Read a 4-byte IPv4 address in network byte order."""
         raw = struct.unpack_from(">I", data, offset)[0]
         return str(ipaddress.IPv4Address(raw))
+
+    def _read_endpoint_addrs(
+        self, data: bytes, local_off: int, remote_off: int, family: str
+    ) -> tuple[str, str]:
+        """Resolve local/remote addresses for the endpoint's address family.
+
+        For IPv6 endpoints the on-disk address is not stored inline at the IPv4
+        offsets, so we report it unresolved ("::") rather than fabricating an
+        IPv4 from IPv6 bytes -- which would produce a wrong-host attribution.
+        """
+        if family == "ipv4":
+            return self._read_ipv4(data, local_off), self._read_ipv4(data, remote_off)
+        return "::", "::"

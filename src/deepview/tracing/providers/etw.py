@@ -44,6 +44,10 @@ class ETWBackend:
     def backend_name(self) -> str:
         return "etw"
 
+    def is_available(self) -> bool:
+        import sys
+        return sys.platform == "win32"
+
     async def start(self, probes: list[ProbeSpec]) -> None:
         import sys
         if sys.platform != "win32":

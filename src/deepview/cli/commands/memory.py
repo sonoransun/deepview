@@ -20,12 +20,72 @@ def memory():
 def acquire(ctx, method, fmt, output, compress):
     """Acquire memory from live system."""
     console = ctx.obj["console"]
-    context = ctx.obj["context"]
-    console.print(f"[bold]Acquiring memory...[/bold]")
+    context: AnalysisContext = ctx.obj["context"]
+    console.print("[bold]Acquiring memory...[/bold]")
     console.print(f"  Method: {method}")
     console.print(f"  Format: {fmt}")
     console.print(f"  Output: {output}")
-    console.print("[yellow]Acquisition requires platform-specific tools. Run 'deepview doctor' to check available providers.[/yellow]")
+
+    try:
+        from deepview.memory.manager import MemoryManager
+        from deepview.core.types import AcquisitionTarget, DumpFormat
+
+        mem_manager = MemoryManager(context)
+        if not mem_manager.available_providers:
+            console.print(
+                "[yellow]No acquisition provider available on this platform. "
+                "Run 'deepview doctor' to check.[/yellow]"
+            )
+            raise SystemExit(1)
+
+        fmt_map = {
+            "raw": DumpFormat.RAW,
+            "lime": DumpFormat.LIME,
+            "padded": DumpFormat.PADDED,
+        }
+        result = mem_manager.acquire(
+            target=AcquisitionTarget(),
+            output=Path(output),
+            method=method,
+            fmt=fmt_map.get(fmt, DumpFormat.RAW),
+        )
+
+        if not result.success:
+            console.print("[red]Acquisition failed.[/red]")
+            raise SystemExit(1)
+
+        console.print(
+            f"[green]Acquired {result.size_bytes:,} bytes in "
+            f"{result.duration_seconds:.1f}s[/green]"
+        )
+        console.print(f"  Output:  {result.output_path}")
+        console.print(f"  {result.algorithm.upper()}: {result.hash_sha256}")
+        if result.manifest_path:
+            console.print(f"  Manifest: {result.manifest_path}")
+        if result.truncated:
+            console.print(
+                f"[yellow]WARNING: acquisition was truncated and the image is "
+                f"INCOMPLETE ({result.read_error}). Do not certify it as a full "
+                f"capture.[/yellow]"
+            )
+
+        from deepview.utils.audit import audit_event, default_audit_log
+
+        audit_event(
+            default_audit_log(context.config.config_dir),
+            "memory.acquire",
+            method=method,
+            output=str(result.output_path),
+            algorithm=result.algorithm,
+            digest=result.hash_sha256,
+            size_bytes=result.size_bytes,
+            truncated=result.truncated,
+        )
+    except SystemExit:
+        raise
+    except Exception as e:
+        console.print(f"[red]Error during acquisition: {e}[/red]")
+        raise SystemExit(1)
 
 @memory.command()
 @click.option("--image", "-i", type=click.Path(exists=True), required=True, help="Memory image path")
@@ -116,6 +176,100 @@ def symbols(ctx, generate, download, list_symbols):
 def memory_scan(ctx, image, rules, rule_tag):
     """YARA scan on memory image."""
     console = ctx.obj["console"]
+    context: AnalysisContext = ctx.obj["context"]
     console.print(f"[bold]Scanning memory image: {image}[/bold]")
     console.print(f"  Rules: {rules}")
-    console.print("[yellow]Scanning requires YARA. Install with: pip install deepview[memory][/yellow]")
+
+    from deepview.scanning.yara_engine import YaraScanner
+
+    scanner = YaraScanner()
+    if not scanner.is_available:
+        console.print(
+            "[yellow]yara-python not installed. Install with: "
+            "pip install deepview[memory][/yellow]"
+        )
+        raise SystemExit(1)
+
+    try:
+        from deepview.memory.manager import MemoryManager
+
+        scanner.load_rules(Path(rules))
+        mem_manager = MemoryManager(context)
+        layer = mem_manager.open_layer(Path(image))
+        results = list(scanner.scan_layer(layer))
+    except Exception as e:
+        console.print(f"[red]Scan error: {e}[/red]")
+        raise SystemExit(1)
+
+    from rich.table import Table
+
+    table = Table(title=f"YARA matches ({len(results)})")
+    table.add_column("Offset", style="cyan")
+    table.add_column("Rule")
+    table.add_column("String")
+    for r in results[:1000]:
+        table.add_row(hex(r.offset), r.rule_name, str(r.metadata.get("string_id", "")))
+    console.print(table)
+    console.print(f"[green]{len(results)} match(es).[/green]")
+
+@memory.command()
+@click.option("--image", "-i", type=click.Path(exists=True), required=True, help="Memory image path")
+@click.option("--sha256", "expected", default=None, help="Expected digest to verify against")
+@click.option("--manifest", type=click.Path(exists=True), default=None, help="Manifest with recorded digest")
+@click.pass_context
+def verify(ctx, image, expected, manifest):
+    """Verify a memory image's integrity against a hash or evidence manifest."""
+    import json
+
+    console = ctx.obj["console"]
+    context: AnalysisContext = ctx.obj["context"]
+
+    from deepview.utils.hashing import hash_file, verify_hash
+
+    algorithm = "sha256"
+    if manifest and not expected:
+        try:
+            data = json.loads(Path(manifest).read_text())
+            artifacts = data.get("artifacts", [])
+        except (OSError, ValueError) as e:
+            console.print(f"[red]Cannot read manifest: {e}[/red]")
+            raise SystemExit(2)
+        image_name = Path(image).name
+        match = next(
+            (a for a in artifacts if Path(a.get("path", "")).name == image_name),
+            artifacts[0] if artifacts else None,
+        )
+        if match:
+            expected = match.get("digest")
+            algorithm = match.get("algorithm", "sha256")
+
+    if not expected:
+        console.print("[red]Provide --sha256 <digest> or --manifest with a recorded digest.[/red]")
+        raise SystemExit(2)
+
+    try:
+        matched = verify_hash(Path(image), expected, algorithm)
+        computed = hash_file(Path(image), algorithm)
+    except Exception as e:
+        console.print(f"[red]Verification error: {e}[/red]")
+        raise SystemExit(2)
+
+    from deepview.utils.audit import audit_event, default_audit_log
+
+    audit_event(
+        default_audit_log(context.config.config_dir),
+        "memory.verify",
+        image=str(image),
+        algorithm=algorithm,
+        expected=expected,
+        computed=computed,
+        matched=matched,
+    )
+
+    if matched:
+        console.print(f"[green]OK: {image} matches the expected {algorithm} digest.[/green]")
+    else:
+        console.print(f"[red]MISMATCH: {image} does NOT match the expected {algorithm} digest.[/red]")
+        console.print(f"  expected: {expected}")
+        console.print(f"  computed: {computed}")
+        raise SystemExit(1)

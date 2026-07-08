@@ -1,6 +1,5 @@
 """Live memory access provider."""
 from __future__ import annotations
-import shutil
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -60,19 +59,30 @@ class LiveMemoryProvider(MemoryAcquisitionProvider):
 
         log.info("acquiring_live", source=source, output=str(output))
 
-        # Copy memory source to output file
+        # Copy memory source to output file. A read error mid-stream (e.g. a
+        # reserved/PCI hole under CONFIG_STRICT_DEVMEM) truncates the image; we
+        # record that rather than certifying a partial dump as complete.
         chunk_size = 1024 * 1024  # 1 MiB
+        truncated = False
+        read_error = ""
+        bytes_written = 0
         with open(source, "rb") as src, open(output, "wb") as dst:
             while True:
                 try:
                     chunk = src.read(chunk_size)
-                    if not chunk:
-                        break
-                    dst.write(chunk)
-                except (IOError, OSError):
-                    break  # Expected at end of readable memory
+                except (IOError, OSError) as e:
+                    truncated = True
+                    read_error = f"{type(e).__name__} at offset {bytes_written}: {e}"
+                    log.warning("live_read_error", offset=bytes_written, error=read_error)
+                    break
+                if not chunk:
+                    break  # clean EOF
+                dst.write(chunk)
+                bytes_written += len(chunk)
 
-        result_obj = make_result(output, fmt, start)
+        result_obj = make_result(
+            output, fmt, start, truncated=truncated, read_error=read_error, method="live"
+        )
         if self._context is not None:
             self._context.events.publish(
                 MemoryAcquiredEvent(
